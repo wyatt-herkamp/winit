@@ -1,5 +1,5 @@
-use crate::{platform::macos::ActivationPolicy, platform_impl::platform::app_state::AppState};
-
+use crate::{event::Event, platform::macos::ActivationPolicy};
+use crate::platform_impl::platform::{app_state::AppState, event::EventWrapper};
 use cocoa::base::id;
 use objc::{
     declare::ClassDecl,
@@ -34,10 +34,24 @@ lazy_static! {
         decl.add_method(sel!(dealloc), dealloc as extern "C" fn(&Object, Sel));
 
         decl.add_method(
+            sel!(applicationWillFinishLaunching:),
+            will_finish_launching as extern "C" fn(&Object, Sel, id),
+        );
+        decl.add_method(
             sel!(applicationDidFinishLaunching:),
             did_finish_launching as extern "C" fn(&Object, Sel, id),
         );
         decl.add_ivar::<*mut c_void>(AUX_DELEGATE_STATE_NAME);
+        decl.add_method(
+            sel!(handleEvent:withReplyEvent:),
+            handle_url
+                as extern "C" fn(
+                    &objc::runtime::Object,
+                    _cmd: objc::runtime::Sel,
+                    event: *mut Object,
+                    _reply: u64,
+                ),
+        );
 
         AppDelegateClass(decl.register())
     };
@@ -72,6 +86,55 @@ extern "C" fn dealloc(this: &Object, _: Sel) {
         // memory
         Box::from_raw(state_ptr as *mut RefCell<AuxDelegateState>);
     }
+}
+
+fn parse_url(event: *mut Object) -> Option<String> {
+    unsafe {
+        let class: u32 = msg_send![event, eventClass];
+        let id: u32 = msg_send![event, eventID];
+        if class != 0x4755524c_u32 || id != 0x4755524c_u32 {
+            return None;
+        }
+        let subevent: *mut Object = msg_send![event, paramDescriptorForKeyword: 0x2d2d2d2d];
+        let nsstring: *mut Object = msg_send![subevent, stringValue];
+
+        let cstr: *const i8 = msg_send![nsstring, UTF8String];
+        if cstr != std::ptr::null() {
+            Some(
+                std::ffi::CStr::from_ptr(cstr)
+                    .to_string_lossy()
+                    .into_owned(),
+            )
+        } else {
+            None
+        }
+    }
+}
+
+extern "C" fn handle_url(
+    _this: &objc::runtime::Object,
+    _cmd: objc::runtime::Sel,
+    event: *mut Object,
+    _reply: u64,
+) {
+    if let Some(string) = parse_url(event) {
+        AppState::queue_event(EventWrapper::StaticEvent(Event::ReceivedUrl(string)));
+    }
+}
+
+extern "C" fn will_finish_launching(this: &Object, _: Sel, _: id) {
+    trace!("Triggered `applicationWillFinishLaunching`");
+    unsafe {
+        let event_manager = class!(NSAppleEventManager);
+        let shared_manager: *mut Object = msg_send![event_manager, sharedAppleEventManager];
+        let () = msg_send![shared_manager,
+                    setEventHandler: this
+                    andSelector: sel!(handleEvent:withReplyEvent:)
+                    forEventClass: 0x4755524c_u32
+                    andEventID: 0x4755524c_u32
+        ];
+    }
+    trace!("Completed `applicationWillFinishLaunching`");
 }
 
 extern "C" fn did_finish_launching(this: &Object, _: Sel, _: id) {
