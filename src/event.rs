@@ -370,6 +370,11 @@ pub enum WindowEvent<'a> {
     ///
     /// At the moment this is only supported on Windows.
     ThemeChanged(Theme),
+
+    /// An entry in the active menu has been activated.
+    ///
+    /// The event contains the `id` of the entry (given by the user when it was created).
+    MenuEntryActivated(isize),
 }
 
 impl Clone for WindowEvent<'static> {
@@ -458,7 +463,8 @@ impl Clone for WindowEvent<'static> {
             ThemeChanged(theme) => ThemeChanged(theme.clone()),
             ScaleFactorChanged { .. } => {
                 unreachable!("Static event can't be about scale factor changing")
-            }
+            },
+            MenuEntryActivated(id) => MenuEntryActivated(*id)
         };
     }
 }
@@ -543,6 +549,7 @@ impl<'a> WindowEvent<'a> {
             Touch(touch) => Some(Touch(touch)),
             ThemeChanged(theme) => Some(ThemeChanged(theme)),
             ScaleFactorChanged { .. } => None,
+            MenuEntryActivated(id) => Some(MenuEntryActivated(id)),
         }
     }
 }
@@ -986,6 +993,191 @@ pub enum VirtualKeyCode {
     Copy,
     Paste,
     Cut,
+}
+
+impl From<VirtualKeyCode> for String{
+    fn from(key: VirtualKeyCode) -> Self {
+        let converted = match key{
+            VirtualKeyCode::Key1 => "1",
+            VirtualKeyCode::Key2 => "2",
+            VirtualKeyCode::Key3 => "3",
+            VirtualKeyCode::Key4 => "4",
+            VirtualKeyCode::Key5 => "5",
+            VirtualKeyCode::Key6 => "6",
+            VirtualKeyCode::Key7 => "7",
+            VirtualKeyCode::Key8 => "8",
+            VirtualKeyCode::Key9 => "9",
+            VirtualKeyCode::Key0 => "0",
+
+            VirtualKeyCode::A => "A",
+            VirtualKeyCode::B => "B",
+            VirtualKeyCode::C => "C",
+            VirtualKeyCode::D => "D",
+            VirtualKeyCode::E => "E",
+            VirtualKeyCode::F => "F",
+            VirtualKeyCode::G => "G",
+            VirtualKeyCode::H => "H",
+            VirtualKeyCode::I => "I",
+            VirtualKeyCode::J => "J",
+            VirtualKeyCode::K => "K",
+            VirtualKeyCode::L => "L",
+            VirtualKeyCode::M => "M",
+            VirtualKeyCode::N => "N",
+            VirtualKeyCode::O => "O",
+            VirtualKeyCode::P => "P",
+            VirtualKeyCode::Q => "Q",
+            VirtualKeyCode::R => "R",
+            VirtualKeyCode::S => "S",
+            VirtualKeyCode::T => "T",
+            VirtualKeyCode::U => "U",
+            VirtualKeyCode::V => "V",
+            VirtualKeyCode::W => "W",
+            VirtualKeyCode::X => "X",
+            VirtualKeyCode::Y => "Y",
+            VirtualKeyCode::Z => "Z",
+
+            VirtualKeyCode::Escape => "Esc",
+
+            VirtualKeyCode::F1 => "F1",
+            VirtualKeyCode::F2 => "F2",
+            VirtualKeyCode::F3 => "F3",
+            VirtualKeyCode::F4 => "F4",
+            VirtualKeyCode::F5 => "F5",
+            VirtualKeyCode::F6 => "F6",
+            VirtualKeyCode::F7 => "F7",
+            VirtualKeyCode::F8 => "F8",
+            VirtualKeyCode::F9 => "F9",
+            VirtualKeyCode::F10 => "F10",
+            VirtualKeyCode::F11 => "F11",
+            VirtualKeyCode::F12 => "F12",
+            VirtualKeyCode::F13 => "F13",
+            VirtualKeyCode::F14 => "F14",
+            VirtualKeyCode::F15 => "F15",
+            VirtualKeyCode::F16 => "F16",
+            VirtualKeyCode::F17 => "F17",
+            VirtualKeyCode::F18 => "F18",
+            VirtualKeyCode::F19 => "F19",
+            VirtualKeyCode::F20 => "F20",
+            VirtualKeyCode::F21 => "F21",
+            VirtualKeyCode::F22 => "F22",
+            VirtualKeyCode::F23 => "F23",
+            VirtualKeyCode::F24 => "F24",
+
+            VirtualKeyCode::Snapshot => "PrtScn",
+            VirtualKeyCode::Scroll => "ScrLk",
+            VirtualKeyCode::Pause => "Pause",
+
+            VirtualKeyCode::Insert => "Ins",
+            VirtualKeyCode::Home => "Home",
+            VirtualKeyCode::Delete => "Del",
+            VirtualKeyCode::End => "End",
+            VirtualKeyCode::PageDown => "PgDn",
+            VirtualKeyCode::PageUp => "PgUp",
+
+            VirtualKeyCode::Left => "Left",
+            VirtualKeyCode::Up => "Up",
+            VirtualKeyCode::Right => "Right",
+            VirtualKeyCode::Down => "Down",
+
+            VirtualKeyCode::Back => "Backspace",
+            VirtualKeyCode::Return => "Enter",
+            VirtualKeyCode::Space => "Space",
+
+            VirtualKeyCode::Compose => "Compose",
+
+            VirtualKeyCode::Caret => "^",
+
+            VirtualKeyCode::Numlock => "NumLk",
+            VirtualKeyCode::Numpad0 => "Numpad0",
+            VirtualKeyCode::Numpad1 => "Numpad1",
+            VirtualKeyCode::Numpad2 => "Numpad2",
+            VirtualKeyCode::Numpad3 => "Numpad3",
+            VirtualKeyCode::Numpad4 => "Numpad4",
+            VirtualKeyCode::Numpad5 => "Numpad5",
+            VirtualKeyCode::Numpad6 => "Numpad6",
+            VirtualKeyCode::Numpad7 => "Numpad7",
+            VirtualKeyCode::Numpad8 => "Numpad8",
+            VirtualKeyCode::Numpad9 => "Numpad9",
+            VirtualKeyCode::NumpadAdd => "+",
+            VirtualKeyCode::NumpadDivide => "/",
+            VirtualKeyCode::NumpadDecimal => ".",
+            VirtualKeyCode::NumpadComma => ",",
+            VirtualKeyCode::NumpadEnter => "Enter",
+            VirtualKeyCode::NumpadEquals => "=",
+            VirtualKeyCode::NumpadMultiply => "*",
+            VirtualKeyCode::NumpadSubtract => "-",
+
+            VirtualKeyCode::AbntC1 => "AbntC1",
+            VirtualKeyCode::AbntC2 => "AbntC2",
+            VirtualKeyCode::Apostrophe => "'",
+            VirtualKeyCode::Apps => "Apps",
+            VirtualKeyCode::Asterisk => "*",
+            VirtualKeyCode::At => "At",
+            VirtualKeyCode::Ax => "Ax",
+            VirtualKeyCode::Backslash => "\\",
+            VirtualKeyCode::Calculator => "Calculator",
+            VirtualKeyCode::Capital => "CapsLock",
+            VirtualKeyCode::Colon => ";",
+            VirtualKeyCode::Comma => ",",
+            VirtualKeyCode::Convert => "Convert",
+            VirtualKeyCode::Equals => "=",
+            VirtualKeyCode::Grave => "Grave",
+            VirtualKeyCode::Kana => "Kana",
+            VirtualKeyCode::Kanji => "Kanji",
+            VirtualKeyCode::LAlt => "LAlt",
+            VirtualKeyCode::LBracket => "LBracket",
+            VirtualKeyCode::LControl => "LControl",
+            VirtualKeyCode::LShift => "LShift",
+            VirtualKeyCode::LWin => "LWin",
+            VirtualKeyCode::Mail => "Mail",
+            VirtualKeyCode::MediaSelect => "MediaSelect",
+            VirtualKeyCode::MediaStop => "MediaStop",
+            VirtualKeyCode::Minus => "Minus",
+            VirtualKeyCode::Mute => "Mute",
+            VirtualKeyCode::MyComputer => "MyComputer",
+
+            VirtualKeyCode::NavigateForward => "Next",
+            VirtualKeyCode::NavigateBackward => "Prior",
+
+            VirtualKeyCode::NextTrack => "NextTrack",
+            VirtualKeyCode::NoConvert => "NoConvert",
+            VirtualKeyCode::OEM102 => "OEM102",
+            VirtualKeyCode::Period => ".",
+            VirtualKeyCode::PlayPause => "PlayPause",
+            VirtualKeyCode::Plus => "Plus",
+            VirtualKeyCode::Power => "Power",
+            VirtualKeyCode::PrevTrack => "PrevTrack",
+            VirtualKeyCode::RAlt => "RAlt",
+            VirtualKeyCode::RBracket => "RBracket",
+            VirtualKeyCode::RControl => "RControl",
+            VirtualKeyCode::RShift => "RShift",
+            VirtualKeyCode::RWin => "RWin",
+            VirtualKeyCode::Semicolon => "Semicolon",
+            VirtualKeyCode::Slash => "Slash",
+            VirtualKeyCode::Sleep => "Sleep",
+            VirtualKeyCode::Stop => "Stop",
+            VirtualKeyCode::Sysrq => "Sysrq",
+            VirtualKeyCode::Tab => "Tab",
+            VirtualKeyCode::Underline => "_",
+            VirtualKeyCode::Unlabeled => "Unlabeled",
+            VirtualKeyCode::VolumeDown => "VolDown",
+            VirtualKeyCode::VolumeUp => "VolUp",
+            VirtualKeyCode::Wake => "Wake",
+            VirtualKeyCode::WebBack => "WebBack",
+            VirtualKeyCode::WebFavorites => "WebFavorites",
+            VirtualKeyCode::WebForward => "WebForward",
+            VirtualKeyCode::WebHome => "WebHome",
+            VirtualKeyCode::WebRefresh => "WebRefresh",
+            VirtualKeyCode::WebSearch => "WebSearch",
+            VirtualKeyCode::WebStop => "WebStop",
+            VirtualKeyCode::Yen => "Yen",
+            VirtualKeyCode::Copy => "Copy",
+            VirtualKeyCode::Paste => "Paste",
+            VirtualKeyCode::Cut => "Cut",
+        };
+
+        String::from(converted)
+    }
 }
 
 impl ModifiersState {

@@ -2,6 +2,7 @@ use std::{
     io, mem,
     ops::BitAnd,
     os::raw::c_void,
+    os::windows::ffi::OsStrExt,
     ptr, slice,
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -27,6 +28,13 @@ where
     T: Copy + PartialEq + BitAnd<T, Output = T>,
 {
     bitset & flag == flag
+}
+
+pub fn string_to_wchar(string: &str) -> Vec<wchar_t>{
+    std::ffi::OsStr::new(string)
+        .encode_wide()
+        .chain(Some(0))
+        .collect()
 }
 
 pub fn wchar_to_string(wchar: &[wchar_t]) -> String {

@@ -859,6 +859,17 @@ unsafe fn public_window_callback_inner<T: 'static>(
             0
         }
 
+        winuser::WM_COMMAND => {
+            use crate::event::WindowEvent::MenuEntryActivated;
+            let id = LOWORD(wparam as DWORD) as isize;
+
+            subclass_input.send_event(Event::WindowEvent {
+                window_id: RootWindowId(WindowId(window)),
+                event: MenuEntryActivated(id),
+            });
+            0
+        }
+
         winuser::WM_DESTROY => {
             use crate::event::WindowEvent::Destroyed;
             ole2::RevokeDragDrop(window);

@@ -10,6 +10,7 @@ use crate::{
 };
 
 pub use crate::icon::{BadIcon, Icon};
+pub use crate::platform_impl::{Menu, Hotkey};
 
 /// Represents a window.
 ///
@@ -186,6 +187,11 @@ pub struct WindowAttributes {
     ///
     /// The default is `None`.
     pub window_icon: Option<Icon>,
+
+    /// The window menu.
+    ///
+    /// The default is `None`.
+    pub menu: Option<Menu>,
 }
 
 impl Default for WindowAttributes {
@@ -205,6 +211,7 @@ impl Default for WindowAttributes {
             decorations: true,
             always_on_top: false,
             window_icon: None,
+            menu: None,
         }
     }
 }
@@ -354,6 +361,18 @@ impl WindowBuilder {
         self.window.window_icon = window_icon;
         self
     }
+
+    /// Sets the window menu.
+    ///
+    /// See [`Window::set_menu`] for details.
+    ///
+    /// [`Window::set_menu`]: crate::window::Window::set_menu
+    #[inline]
+    pub fn with_menu(mut self, menu: Option<Menu>) -> Self {
+        self.window.menu = menu;
+        self
+    }
+    
 
     /// Builds the window.
     ///
@@ -719,6 +738,18 @@ impl Window {
     #[inline]
     pub fn set_window_icon(&self, window_icon: Option<Icon>) {
         self.window.set_window_icon(window_icon)
+    }
+
+    /// Sets the window menu.
+    ///
+    /// ## Platform-specific
+    ///
+    /// - **iOS / Android / Web / Linux:** Unsupported.
+    ///
+    /// This is only supported on Windows and macOS.
+    #[inline]
+    pub fn set_menu(&self, menu: Option<Menu>) {
+        self.window.set_menu(menu)
     }
 
     /// Sets location of IME candidate box in client area coordinates relative to the top left.
