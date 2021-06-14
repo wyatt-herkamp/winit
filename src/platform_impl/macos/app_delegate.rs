@@ -1,4 +1,5 @@
-use crate::{event::Event, platform::macos::ActivationPolicy};
+use crate::event::{Event, MacOS, PlatformSpecific};
+use crate::platform::macos::ActivationPolicy;
 use crate::platform_impl::platform::{app_state::AppState, event::EventWrapper};
 use cocoa::base::id;
 use objc::{
@@ -20,6 +21,14 @@ pub struct AuxDelegateState {
 
     pub create_default_menu: bool,
 }
+
+/// Apple constants
+#[allow(non_upper_case_globals)]
+pub const kInternetEventClass: u32 = 0x4755524c;
+#[allow(non_upper_case_globals)]
+pub const kAEGetURL: u32 = 0x4755524c;
+#[allow(non_upper_case_globals)]
+pub const keyDirectObject: u32 = 0x2d2d2d2d;
 
 pub struct AppDelegateClass(pub *const Class);
 unsafe impl Send for AppDelegateClass {}
@@ -92,10 +101,10 @@ fn parse_url(event: *mut Object) -> Option<String> {
     unsafe {
         let class: u32 = msg_send![event, eventClass];
         let id: u32 = msg_send![event, eventID];
-        if class != 0x4755524c_u32 || id != 0x4755524c_u32 {
+        if class != kInternetEventClass || id != kAEGetURL {
             return None;
         }
-        let subevent: *mut Object = msg_send![event, paramDescriptorForKeyword: 0x2d2d2d2d];
+        let subevent: *mut Object = msg_send![event, paramDescriptorForKeyword: keyDirectObject];
         let nsstring: *mut Object = msg_send![subevent, stringValue];
 
         let cstr: *const i8 = msg_send![nsstring, UTF8String];
@@ -118,7 +127,9 @@ extern "C" fn handle_url(
     _reply: u64,
 ) {
     if let Some(string) = parse_url(event) {
-        AppState::queue_event(EventWrapper::StaticEvent(Event::ReceivedUrl(string)));
+        AppState::queue_event(EventWrapper::StaticEvent(Event::PlatformSpecific(
+            PlatformSpecific::MacOS(MacOS::ReceivedUrl(string)),
+        )));
     }
 }
 
@@ -130,8 +141,8 @@ extern "C" fn will_finish_launching(this: &Object, _: Sel, _: id) {
         let () = msg_send![shared_manager,
                     setEventHandler: this
                     andSelector: sel!(handleEvent:withReplyEvent:)
-                    forEventClass: 0x4755524c_u32
-                    andEventID: 0x4755524c_u32
+                    forEventClass: kInternetEventClass
+                    andEventID: kAEGetURL
         ];
     }
     trace!("Completed `applicationWillFinishLaunching`");
