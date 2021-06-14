@@ -117,6 +117,19 @@ pub enum Event<'a, T: 'static> {
     /// gets emitted. You generally want to treat this as an "do on quit" event.
     LoopDestroyed,
 
+    /// Emitted when the event loop receives an event that only occurs on some specific platform.
+    PlatformSpecific(PlatformSpecific),
+}
+
+/// Describes an event from some specific platform.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PlatformSpecific {
+    MacOS(MacOS),
+}
+
+/// Describes an event that only happens in `MacOS`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MacOS {
     ReceivedUrl(String),
 }
 
@@ -140,7 +153,7 @@ impl<T: Clone> Clone for Event<'static, T> {
             LoopDestroyed => LoopDestroyed,
             Suspended => Suspended,
             Resumed => Resumed,
-            ReceivedUrl(url) => ReceivedUrl(url.clone()),
+            PlatformSpecific(event) => PlatformSpecific(event.clone()),
         }
     }
 }
@@ -159,7 +172,7 @@ impl<'a, T> Event<'a, T> {
             LoopDestroyed => Ok(LoopDestroyed),
             Suspended => Ok(Suspended),
             Resumed => Ok(Resumed),
-            ReceivedUrl(url) => Ok(ReceivedUrl(url)),
+            PlatformSpecific(event) => Ok(PlatformSpecific(event)),
         }
     }
 
@@ -180,7 +193,7 @@ impl<'a, T> Event<'a, T> {
             LoopDestroyed => Some(LoopDestroyed),
             Suspended => Some(Suspended),
             Resumed => Some(Resumed),
-            ReceivedUrl(url) => Some(ReceivedUrl(url)),
+            PlatformSpecific(event) => Some(PlatformSpecific(event)),
         }
     }
 }
