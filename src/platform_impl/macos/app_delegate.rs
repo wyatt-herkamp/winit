@@ -18,8 +18,6 @@ pub struct AuxDelegateState {
     /// after the app has finished launching. If the activation policy is set earlier, the
     /// menubar is initially unresponsive on macOS 10.15 for example.
     pub activation_policy: ActivationPolicy,
-
-    pub create_default_menu: bool,
 }
 
 /// Apple constants
@@ -49,6 +47,10 @@ lazy_static! {
         decl.add_method(
             sel!(applicationDidFinishLaunching:),
             did_finish_launching as extern "C" fn(&Object, Sel, id),
+        );
+        decl.add_method(
+            sel!(handle_menu:),
+            handle_menu as extern "C" fn(&Object, Sel, id)
         );
         decl.add_ivar::<*mut c_void>(AUX_DELEGATE_STATE_NAME);
         decl.add_method(
@@ -81,7 +83,6 @@ extern "C" fn new(class: &Class, _: Sel) -> id {
             AUX_DELEGATE_STATE_NAME,
             Box::into_raw(Box::new(RefCell::new(AuxDelegateState {
                 activation_policy: ActivationPolicy::Regular,
-                create_default_menu: true,
             }))) as *mut c_void,
         );
         this
@@ -152,4 +153,14 @@ extern "C" fn did_finish_launching(this: &Object, _: Sel, _: id) {
     trace!("Triggered `applicationDidFinishLaunching`");
     AppState::launched(this);
     trace!("Completed `applicationDidFinishLaunching`");
+}
+
+extern "C" fn handle_menu(_this: &Object, _cmd: Sel, item: id){
+    unsafe{
+        let id = msg_send![item, tag];
+        AppState::queue_event(EventWrapper::StaticEvent(Event::WindowEvent{
+            window_id: WindowId(window::Id(0)),
+            event: WindowEvent::MenuEntryActivated(id),
+        }));
+    }
 }
