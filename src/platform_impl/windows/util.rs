@@ -30,7 +30,7 @@ where
     bitset & flag == flag
 }
 
-pub fn string_to_wchar(string: &str) -> Vec<wchar_t>{
+pub fn string_to_wchar(string: &str) -> Vec<wchar_t> {
     std::ffi::OsStr::new(string)
         .encode_wide()
         .chain(Some(0))

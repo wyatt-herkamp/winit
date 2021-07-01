@@ -1,5 +1,5 @@
-use crate::event::{ModifiersState, VirtualKeyCode};
 use super::util::IdRef;
+use crate::event::{ModifiersState, VirtualKeyCode};
 use cocoa::appkit::{NSEventModifierFlags, NSMenu, NSMenuItem};
 use cocoa::base::{nil, selector};
 use cocoa::foundation::{NSProcessInfo, NSString};
@@ -8,21 +8,18 @@ use objc::{
     runtime::{Object, Sel},
 };
 
-pub struct Hotkey{
+pub struct Hotkey {
     modifiers: ModifiersState,
-    key: VirtualKeyCode
+    key: VirtualKeyCode,
 }
 
-impl Hotkey{
-    pub fn new(modifiers: ModifiersState, key: VirtualKeyCode) -> Self{
-        Self{
-            modifiers,
-            key,
-        }
+impl Hotkey {
+    pub fn new(modifiers: ModifiersState, key: VirtualKeyCode) -> Self {
+        Self { modifiers, key }
     }
 
-    fn parse(&self) -> (String, Option<NSEventModifierFlags>){
-        let key = match self.key{
+    fn parse(&self) -> (String, Option<NSEventModifierFlags>) {
+        let key = match self.key {
             VirtualKeyCode::Key1 => '1',
             VirtualKeyCode::Key2 => '2',
             VirtualKeyCode::Key3 => '3',
@@ -112,19 +109,19 @@ impl Hotkey{
         };
 
         let mut mask = NSEventModifierFlags::empty();
-        if self.modifiers.logo(){
+        if self.modifiers.logo() {
             mask.set(NSEventModifierFlags::NSCommandKeyMask, true);
         }
-        
-        if self.modifiers.ctrl(){
+
+        if self.modifiers.ctrl() {
             mask.set(NSEventModifierFlags::NSControlKeyMask, true);
         }
-        
-        if self.modifiers.shift(){
+
+        if self.modifiers.shift() {
             mask.set(NSEventModifierFlags::NSShiftKeyMask, true);
         }
-        
-        if self.modifiers.alt(){
+
+        if self.modifiers.alt() {
             mask.set(NSEventModifierFlags::NSAlternateKeyMask, true);
         }
 
@@ -137,7 +134,7 @@ struct KeyEquivalent<'a> {
     masks: Option<NSEventModifierFlags>,
 }
 
-impl Default for Menu{
+impl Default for Menu {
     fn default() -> Self {
         autoreleasepool(|| unsafe {
             let menubar = IdRef::new(NSMenu::new(nil));
@@ -217,9 +214,7 @@ impl Default for Menu{
             app_menu.addItem_(quit_item);
             app_menu_item.setSubmenu_(app_menu);
 
-            Menu{
-                raw: menubar,
-            }
+            Menu { raw: menubar }
         })
     }
 }
@@ -245,30 +240,39 @@ fn menu_item(
 
 #[derive(Debug, Clone)]
 pub struct Menu {
-    pub (crate) raw: IdRef,
+    pub(crate) raw: IdRef,
 }
 
 impl Menu {
     pub fn new() -> Self {
-        unsafe{
-            Self{
+        unsafe {
+            Self {
                 raw: IdRef::new(NSMenu::new(nil)),
             }
         }
     }
 
-    pub fn add_item<S: Into<String>, H: Into<Option<Hotkey>>>(&mut self, id: usize, name: S, key: H) {
-        autoreleasepool(||unsafe{
+    pub fn add_item<S: Into<String>, H: Into<Option<Hotkey>>>(
+        &mut self,
+        id: usize,
+        name: S,
+        key: H,
+    ) {
+        autoreleasepool(|| unsafe {
             let title = NSString::alloc(nil).init_str(&name.into());
-            let (key, mask) = match key.into(){
+            let (key, mask) = match key.into() {
                 Some(hotkey) => hotkey.parse(),
                 None => (String::new(), None),
             };
 
             let key = NSString::alloc(nil).init_str(&key);
-            let menu_item = NSMenuItem::alloc(nil).initWithTitle_action_keyEquivalent_(title, selector("handle_menu:"), key);
+            let menu_item = NSMenuItem::alloc(nil).initWithTitle_action_keyEquivalent_(
+                title,
+                selector("handle_menu:"),
+                key,
+            );
             let () = msg_send![menu_item, setTag: id as isize];
-            if let Some(mask) = mask{
+            if let Some(mask) = mask {
                 menu_item.setKeyEquivalentModifierMask_(mask);
             }
 
@@ -277,7 +281,7 @@ impl Menu {
     }
 
     pub fn add_dropdown<S: Into<String>>(&mut self, name: S, menu: Menu) {
-        autoreleasepool(||unsafe{
+        autoreleasepool(|| unsafe {
             let title = NSString::alloc(nil).init_str(&name.into());
             let menu_item = NSMenuItem::alloc(nil);
             let () = msg_send![*menu.raw, setTitle: title];
@@ -288,7 +292,7 @@ impl Menu {
     }
 
     pub fn add_separator(&mut self) {
-        autoreleasepool(||unsafe{
+        autoreleasepool(|| unsafe {
             let menu_item = NSMenuItem::separatorItem(nil);
             self.raw.addItem_(menu_item);
         });

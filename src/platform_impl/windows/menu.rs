@@ -1,47 +1,36 @@
-use crate::{event::{ModifiersState, VirtualKeyCode}, platform_impl::platform::util};
-use winapi::shared::windef::HMENU__;
+use crate::{
+    event::{ModifiersState, VirtualKeyCode},
+    platform_impl::platform::util,
+};
 use winapi::shared::basetsd::UINT_PTR;
+use winapi::shared::windef::HMENU__;
 use winapi::um::winuser;
 
-pub struct Hotkey{
+pub struct Hotkey {
     modifiers: ModifiersState,
-    key: VirtualKeyCode
+    key: VirtualKeyCode,
 }
 
-impl Hotkey{
-    pub fn new(modifiers: ModifiersState, key: VirtualKeyCode) -> Self{
-        Self{
-            modifiers,
-            key,
-        }
+impl Hotkey {
+    pub fn new(modifiers: ModifiersState, key: VirtualKeyCode) -> Self {
+        Self { modifiers, key }
     }
 }
 
-impl From<Hotkey> for String{
+impl From<Hotkey> for String {
     fn from(hotkey: Hotkey) -> Self {
         let mut string = String::new();
-        if hotkey.modifiers.logo(){
-            #[cfg(windows)]
+        if hotkey.modifiers.logo() {
             string.push_str("Windows+");
-            #[cfg(linux)]
-            string.push_str("Super+");
-            #[cfg(macos)]
-            string.push_str("Command+");
         }
-
-        if hotkey.modifiers.ctrl(){
+        if hotkey.modifiers.ctrl() {
             string.push_str("Ctrl+");
         }
-
-        if hotkey.modifiers.shift(){
+        if hotkey.modifiers.shift() {
             string.push_str("Shift+");
         }
-
-        if hotkey.modifiers.alt(){
-            #[cfg(not(macos))]
+        if hotkey.modifiers.alt() {
             string.push_str("Alt+");
-            #[cfg(macos)]
-            string.push_str("Option+");
         }
 
         string.push_str(&String::from(hotkey.key));
@@ -57,41 +46,62 @@ pub struct Menu {
 
 impl Menu {
     pub fn new() -> Self {
-        unsafe{
-            Self{
+        unsafe {
+            Self {
                 raw: winuser::CreateMenu(),
             }
         }
     }
 
-    pub fn add_item<S: Into<String>, H: Into<Option<Hotkey>>>(&mut self, id: usize, name: S, key: H) {
-        let content = if let Some(key) = key.into(){
+    pub fn add_item<S: Into<String>, H: Into<Option<Hotkey>>>(
+        &mut self,
+        id: usize,
+        name: S,
+        key: H,
+    ) {
+        let content = if let Some(key) = key.into() {
             format!("{}\t{}", name.into(), String::from(key))
-        }else{
+        } else {
             format!("{}", name.into())
         };
 
-        unsafe{
-            winuser::AppendMenuW(self.raw, winuser::MF_STRING, id as UINT_PTR, util::string_to_wchar(&content).as_mut_ptr());
+        unsafe {
+            winuser::AppendMenuW(
+                self.raw,
+                winuser::MF_STRING,
+                id as UINT_PTR,
+                util::string_to_wchar(&content).as_mut_ptr(),
+            );
         }
     }
 
     pub fn add_dropdown<S: Into<String>>(&mut self, name: S, menu: Menu) {
-        unsafe{
-            winuser::AppendMenuW(self.raw, winuser::MF_POPUP, menu.raw as UINT_PTR, util::string_to_wchar(&name.into()).as_mut_ptr());
+        unsafe {
+            winuser::AppendMenuW(
+                self.raw,
+                winuser::MF_POPUP,
+                menu.raw as UINT_PTR,
+                util::string_to_wchar(&name.into()).as_mut_ptr(),
+            );
         }
     }
 
     pub fn add_separator(&mut self) {
-        unsafe{
+        unsafe {
             winuser::AppendMenuW(self.raw, winuser::MF_SEPARATOR, 0, std::ptr::null());
         }
     }
 }
 
-impl Drop for Menu{
+impl Default for Menu {
+    fn default() -> Self {
+        Menu::new()
+    }
+}
+
+impl Drop for Menu {
     fn drop(&mut self) {
-        unsafe{
+        unsafe {
             winuser::DestroyMenu(self.raw);
         }
     }

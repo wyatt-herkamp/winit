@@ -5,9 +5,9 @@ use winapi::{self, shared::windef::HMENU, shared::windef::HWND};
 pub use self::{
     event_loop::{EventLoop, EventLoopProxy, EventLoopWindowTarget},
     icon::WinIcon,
+    menu::{Hotkey, Menu},
     monitor::{MonitorHandle, VideoMode},
     window::Window,
-    menu::{Menu, Hotkey},
 };
 
 pub use self::icon::WinIcon as PlatformIcon;

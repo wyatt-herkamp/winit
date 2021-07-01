@@ -1,6 +1,8 @@
-use crate::event::{Event, MacOS, PlatformSpecific};
+use crate::event::{Event, MacOS, PlatformSpecific, WindowEvent};
 use crate::platform::macos::ActivationPolicy;
-use crate::platform_impl::platform::{app_state::AppState, event::EventWrapper};
+use crate::platform_impl::platform::{app_state::AppState, event::EventWrapper, window};
+use crate::window::WindowId;
+
 use cocoa::base::id;
 use objc::{
     declare::ClassDecl,
@@ -50,7 +52,7 @@ lazy_static! {
         );
         decl.add_method(
             sel!(handle_menu:),
-            handle_menu as extern "C" fn(&Object, Sel, id)
+            handle_menu as extern "C" fn(&Object, Sel, id),
         );
         decl.add_ivar::<*mut c_void>(AUX_DELEGATE_STATE_NAME);
         decl.add_method(
@@ -155,10 +157,10 @@ extern "C" fn did_finish_launching(this: &Object, _: Sel, _: id) {
     trace!("Completed `applicationDidFinishLaunching`");
 }
 
-extern "C" fn handle_menu(_this: &Object, _cmd: Sel, item: id){
-    unsafe{
+extern "C" fn handle_menu(_this: &Object, _cmd: Sel, item: id) {
+    unsafe {
         let id = msg_send![item, tag];
-        AppState::queue_event(EventWrapper::StaticEvent(Event::WindowEvent{
+        AppState::queue_event(EventWrapper::StaticEvent(Event::WindowEvent {
             window_id: WindowId(window::Id(0)),
             event: WindowEvent::MenuEntryActivated(id),
         }));

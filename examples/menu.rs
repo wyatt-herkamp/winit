@@ -1,5 +1,9 @@
 use simple_logger::SimpleLogger;
-use winit::{event::{Event, ModifiersState, WindowEvent}, event_loop::{ControlFlow, EventLoop}, window::{Menu, WindowBuilder, Hotkey}};
+use winit::{
+    event::{Event, ModifiersState, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+    window::{Hotkey, Menu, WindowBuilder},
+};
 
 fn main() {
     SimpleLogger::new().init().unwrap();
@@ -8,7 +12,11 @@ fn main() {
     let mut main = Menu::default();
 
     let mut first = Menu::new();
-    first.add_item(0, "One", Hotkey::new(ModifiersState::CTRL, winit::event::VirtualKeyCode::Return));
+    first.add_item(
+        0,
+        "One",
+        Hotkey::new(ModifiersState::CTRL, winit::event::VirtualKeyCode::Return),
+    );
 
     main.add_dropdown("First", first);
     let window = WindowBuilder::new()
@@ -17,11 +25,11 @@ fn main() {
         .with_inner_size(winit::dpi::LogicalSize::new(300.0, 128.0))
         .build(&event_loop)
         .unwrap();
-        
-        event_loop.run(move |event, _, control_flow| {
-            *control_flow = ControlFlow::Wait;
-            
-            match event {
+
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::Wait;
+
+        match event {
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 window_id,
@@ -29,12 +37,12 @@ fn main() {
             Event::MainEventsCleared => {
                 window.request_redraw();
             }
-            Event::WindowEvent{
+            Event::WindowEvent {
                 event: WindowEvent::MenuEntryActivated(id),
                 ..
             } => {
                 println!("Activated: {}", id);
-            },
+            }
             _ => (),
         }
     });

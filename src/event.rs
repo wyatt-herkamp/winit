@@ -463,8 +463,8 @@ impl Clone for WindowEvent<'static> {
             ThemeChanged(theme) => ThemeChanged(theme.clone()),
             ScaleFactorChanged { .. } => {
                 unreachable!("Static event can't be about scale factor changing")
-            },
-            MenuEntryActivated(id) => MenuEntryActivated(*id)
+            }
+            MenuEntryActivated(id) => MenuEntryActivated(*id),
         };
     }
 }
@@ -995,9 +995,9 @@ pub enum VirtualKeyCode {
     Cut,
 }
 
-impl From<VirtualKeyCode> for String{
+impl From<VirtualKeyCode> for String {
     fn from(key: VirtualKeyCode) -> Self {
-        let converted = match key{
+        let converted = match key {
             VirtualKeyCode::Key1 => "1",
             VirtualKeyCode::Key2 => "2",
             VirtualKeyCode::Key3 => "3",

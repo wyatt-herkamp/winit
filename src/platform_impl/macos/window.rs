@@ -29,7 +29,7 @@ use crate::{
         OsError,
     },
     window::{
-        CursorIcon, Fullscreen, UserAttentionType, WindowAttributes, WindowId as RootWindowId, Menu,
+        CursorIcon, Fullscreen, Menu, UserAttentionType, WindowAttributes, WindowId as RootWindowId,
     },
 };
 use cocoa::{
@@ -890,7 +890,7 @@ impl UnownedWindow {
 
     #[inline]
     pub fn set_menu(&self, menu: Option<Menu>) {
-        unsafe{
+        unsafe {
             let ns_app = NSApplication::sharedApplication(nil);
             if let Some(ref menu) = menu {
                 ns_app.setMainMenu_(*menu.raw);

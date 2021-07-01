@@ -10,7 +10,7 @@ use crate::{
 };
 
 pub use crate::icon::{BadIcon, Icon};
-pub use crate::platform_impl::{Menu, Hotkey};
+pub use crate::platform_impl::{Hotkey, Menu};
 
 /// Represents a window.
 ///
@@ -372,7 +372,6 @@ impl WindowBuilder {
         self.window.menu = menu;
         self
     }
-    
 
     /// Builds the window.
     ///

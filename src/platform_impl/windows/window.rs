@@ -46,7 +46,7 @@ use crate::{
         window_state::{CursorFlags, SavedWindow, WindowFlags, WindowState},
         Parent, PlatformSpecificWindowBuilderAttributes, WindowId,
     },
-    window::{CursorIcon, Fullscreen, Theme, UserAttentionType, WindowAttributes, Menu},
+    window::{CursorIcon, Fullscreen, Menu, Theme, UserAttentionType, WindowAttributes},
 };
 
 /// The Win32 implementation of the main `Window` object.
@@ -619,15 +619,14 @@ impl Window {
 
     #[inline]
     pub fn set_menu(&self, menu: Option<Menu>) {
-        unsafe{
+        unsafe {
             if let Some(ref menu) = menu {
-                    winuser::SetMenu(self.window.0, menu.raw);
+                winuser::SetMenu(self.window.0, menu.raw);
             } else {
-                    winuser::SetMenu(self.window.0, std::ptr::null_mut());
+                winuser::SetMenu(self.window.0, std::ptr::null_mut());
             }
         }
     }
-    
 
     #[inline]
     pub fn set_taskbar_icon(&self, taskbar_icon: Option<Icon>) {
