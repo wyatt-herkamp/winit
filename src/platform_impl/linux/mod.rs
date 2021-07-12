@@ -40,6 +40,10 @@ pub mod wayland;
 #[cfg(feature = "x11")]
 pub mod x11;
 
+mod menu;
+
+pub use menu::{Hotkey, Menu};
+
 /// Environment variable specifying which backend should be used on unix platform.
 ///
 /// Legal values are x11 and wayland. If this variable is set only the named backend
@@ -403,6 +407,9 @@ impl Window {
     pub fn set_decorations(&self, decorations: bool) {
         x11_or_wayland!(match self; Window(w) => w.set_decorations(decorations))
     }
+
+    #[inline]
+    pub fn set_menu(&self, _menu: Option<Menu>) {}
 
     #[inline]
     pub fn set_always_on_top(&self, _always_on_top: bool) {
