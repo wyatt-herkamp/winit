@@ -8,6 +8,7 @@ use objc::{
     runtime::{Object, Sel},
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Hotkey {
     modifiers: ModifiersState,
     key: VirtualKeyCode,

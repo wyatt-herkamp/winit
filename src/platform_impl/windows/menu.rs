@@ -6,6 +6,7 @@ use winapi::shared::basetsd::UINT_PTR;
 use winapi::shared::windef::HMENU__;
 use winapi::um::winuser;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Hotkey {
     modifiers: ModifiersState,
     key: VirtualKeyCode,

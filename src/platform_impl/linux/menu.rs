@@ -1,5 +1,6 @@
 use crate::event::{ModifiersState, VirtualKeyCode};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Hotkey {
     modifiers: ModifiersState,
     key: VirtualKeyCode,
