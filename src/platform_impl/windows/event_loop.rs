@@ -870,7 +870,7 @@ unsafe fn public_window_callback_inner<T: 'static>(
 
         winuser::WM_COMMAND => {
             use crate::event::WindowEvent::MenuEntryActivated;
-            let id = LOWORD(wparam as DWORD) as u32;
+            let id = LOWORD(wparam as DWORD);
 
             subclass_input.send_event(Event::WindowEvent {
                 window_id: RootWindowId(WindowId(window)),

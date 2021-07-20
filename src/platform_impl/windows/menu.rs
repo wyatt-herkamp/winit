@@ -68,12 +68,12 @@ impl Menu {
 
     pub fn add_item<S: Into<String>, H: Into<Option<Hotkey>>>(
         &mut self,
-        id: usize,
+        id: u16,
         name: S,
         key: H,
     ) {
         let content = if let Some(key) = key.into() {
-            if let Some(accel) = Accelerator::parse(&key, id as u16) {
+            if let Some(accel) = Accelerator::parse(&key, id) {
                 self.accelerators.insert(key, accel);
             }
             format!("{}\t{}", name.into(), String::from(key))

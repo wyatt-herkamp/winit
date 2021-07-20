@@ -374,7 +374,7 @@ pub enum WindowEvent<'a> {
     /// An entry in the active menu has been activated.
     ///
     /// The event contains the `id` of the entry (given by the user when it was created).
-    MenuEntryActivated(u32),
+    MenuEntryActivated(u16),
 }
 
 impl Clone for WindowEvent<'static> {
