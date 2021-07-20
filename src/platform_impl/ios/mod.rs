@@ -71,6 +71,7 @@ macro_rules! assert_main_thread {
 mod app_state;
 mod event_loop;
 mod ffi;
+mod menu;
 mod monitor;
 mod view;
 mod window;
@@ -79,6 +80,7 @@ use std::fmt;
 
 pub use self::{
     event_loop::{EventLoop, EventLoopProxy, EventLoopWindowTarget},
+    menu::{Hotkey, Menu},
     monitor::{MonitorHandle, VideoMode},
     window::{PlatformSpecificWindowBuilderAttributes, Window, WindowId},
 };
