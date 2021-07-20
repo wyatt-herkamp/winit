@@ -158,11 +158,16 @@ extern "C" fn did_finish_launching(this: &Object, _: Sel, _: id) {
 }
 
 extern "C" fn handle_menu(_this: &Object, _cmd: Sel, item: id) {
+    use std::convert::TryFrom;
+
     unsafe {
-        let id = msg_send![item, tag];
-        AppState::queue_event(EventWrapper::StaticEvent(Event::WindowEvent {
-            window_id: WindowId(window::Id(0)),
-            event: WindowEvent::MenuEntryActivated(id),
-        }));
+        let id: isize = msg_send![item, tag];
+
+        if let Ok(id) = u32::try_from(id) {
+            AppState::queue_event(EventWrapper::StaticEvent(Event::WindowEvent {
+                window_id: WindowId(window::Id(0)),
+                event: WindowEvent::MenuEntryActivated(id),
+            }));
+        }
     }
 }
