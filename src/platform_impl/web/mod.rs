@@ -20,6 +20,7 @@
 mod device;
 mod error;
 mod event_loop;
+mod menu;
 mod monitor;
 mod window;
 
@@ -31,6 +32,7 @@ pub use self::error::OsError;
 pub use self::event_loop::{
     EventLoop, Proxy as EventLoopProxy, WindowTarget as EventLoopWindowTarget,
 };
+pub use self::menu::{Hotkey, Menu};
 pub use self::monitor::{Handle as MonitorHandle, Mode as VideoMode};
 pub use self::window::{
     Id as WindowId, PlatformSpecificBuilderAttributes as PlatformSpecificWindowBuilderAttributes,

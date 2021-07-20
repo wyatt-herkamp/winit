@@ -9,7 +9,7 @@ use crate::window::{
 
 use raw_window_handle::web::WebHandle;
 
-use super::{backend, monitor, EventLoopWindowTarget};
+use super::{backend, monitor, EventLoopWindowTarget, Menu};
 
 use std::cell::{Ref, RefCell};
 use std::collections::vec_deque::IntoIter as VecDequeIter;
@@ -88,6 +88,9 @@ impl Window {
     pub fn set_visible(&self, _visible: bool) {
         // Intentionally a no-op
     }
+
+    #[inline]
+    pub fn set_menu(&self, _menu: Option<Menu>) {}
 
     pub fn request_redraw(&self) {
         (self.register_redraw_request)();

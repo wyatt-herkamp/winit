@@ -5,6 +5,7 @@ use winapi::{self, shared::windef::HMENU, shared::windef::HWND};
 pub use self::{
     event_loop::{EventLoop, EventLoopProxy, EventLoopWindowTarget},
     icon::WinIcon,
+    menu::{Hotkey, Menu},
     monitor::{MonitorHandle, VideoMode},
     window::Window,
 };
@@ -103,6 +104,7 @@ mod drop_handler;
 mod event;
 mod event_loop;
 mod icon;
+mod menu;
 mod monitor;
 mod raw_input;
 mod window;

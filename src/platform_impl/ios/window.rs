@@ -20,7 +20,7 @@ use crate::{
             id, CGFloat, CGPoint, CGRect, CGSize, UIEdgeInsets, UIInterfaceOrientationMask,
             UIRectEdge, UIScreenOverscanCompensation,
         },
-        monitor, view, EventLoopWindowTarget, MonitorHandle,
+        monitor, view, EventLoopWindowTarget, Menu, MonitorHandle,
     },
     window::{
         CursorIcon, Fullscreen, UserAttentionType, WindowAttributes, WindowId as RootWindowId,
@@ -118,6 +118,9 @@ impl Inner {
             let () = msg_send![self.window, setBounds: bounds];
         }
     }
+
+    #[inline]
+    pub fn set_menu(&self, _menu: Option<Menu>) {}
 
     pub fn inner_size(&self) -> PhysicalSize<u32> {
         unsafe {

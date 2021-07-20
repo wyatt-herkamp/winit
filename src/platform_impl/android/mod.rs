@@ -18,6 +18,10 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod menu;
+
+pub use menu::{Hotkey, Menu};
+
 lazy_static! {
     static ref CONFIG: RwLock<Configuration> = RwLock::new(Configuration::new());
 }
@@ -492,6 +496,9 @@ impl Window {
     pub fn set_outer_position(&self, _position: Position) {
         // no effect
     }
+
+    #[inline]
+    pub fn set_menu(&self, _menu: Option<Menu>) {}
 
     pub fn inner_size(&self) -> PhysicalSize<u32> {
         self.outer_size()

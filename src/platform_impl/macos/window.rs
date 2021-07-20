@@ -29,7 +29,7 @@ use crate::{
         OsError,
     },
     window::{
-        CursorIcon, Fullscreen, UserAttentionType, WindowAttributes, WindowId as RootWindowId,
+        CursorIcon, Fullscreen, Menu, UserAttentionType, WindowAttributes, WindowId as RootWindowId,
     },
 };
 use cocoa::{
@@ -382,6 +382,7 @@ impl UnownedWindow {
         // `WindowDelegate` to update the state.
         let fullscreen = win_attribs.fullscreen.take();
         let maximized = win_attribs.maximized;
+        let menu = win_attribs.menu.take();
         let visible = win_attribs.visible;
         let decorations = win_attribs.decorations;
         let inner_rect = win_attribs
@@ -402,6 +403,8 @@ impl UnownedWindow {
 
         // Set fullscreen mode after we setup everything
         window.set_fullscreen(fullscreen);
+
+        window.set_menu(menu);
 
         // Setting the window as key has to happen *after* we set the fullscreen
         // state, since otherwise we'll briefly see the window at normal size
@@ -882,6 +885,18 @@ impl UnownedWindow {
                 util::restore_display_mode_async(video_mode.monitor().inner.native_identifier());
             },
             _ => INTERRUPT_EVENT_LOOP_EXIT.store(false, Ordering::SeqCst),
+        }
+    }
+
+    #[inline]
+    pub fn set_menu(&self, menu: Option<Menu>) {
+        unsafe {
+            let ns_app = NSApplication::sharedApplication(nil);
+            if let Some(ref menu) = menu {
+                ns_app.setMainMenu_(*menu.raw);
+            } else {
+                ns_app.setMainMenu_(nil);
+            }
         }
     }
 
