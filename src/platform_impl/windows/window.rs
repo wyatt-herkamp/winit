@@ -42,7 +42,7 @@ use crate::{
         drop_handler::FileDropHandler,
         event_loop::{self, EventLoopWindowTarget, DESTROY_MSG_ID},
         icon::{self, IconType},
-        monitor, util,
+        menu, monitor, util,
         window_state::{CursorFlags, SavedWindow, WindowFlags, WindowState},
         Parent, PlatformSpecificWindowBuilderAttributes, WindowId,
     },
@@ -622,8 +622,17 @@ impl Window {
         unsafe {
             if let Some(ref menu) = menu {
                 winuser::SetMenu(self.window.0, menu.raw);
+                let accelerators = menu
+                    .accelerators
+                    .values()
+                    .map(|i| i.raw)
+                    .collect::<Vec<_>>();
+                menu::ACCELS
+                    .lock()
+                    .insert(menu::AcceleratorTable::new(&accelerators));
             } else {
                 winuser::SetMenu(self.window.0, std::ptr::null_mut());
+                menu::ACCELS.lock().take();
             }
         }
     }
@@ -846,6 +855,17 @@ unsafe fn init<T: 'static>(
         WindowState::set_window_flags(window_state.lock(), real_window.0, |f| *f = window_flags);
         window_state
     };
+
+    if let Some(menu) = attributes.menu {
+        let accelerators = menu
+            .accelerators
+            .values()
+            .map(|i| i.raw)
+            .collect::<Vec<_>>();
+        menu::ACCELS
+            .lock()
+            .insert(menu::AcceleratorTable::new(&accelerators));
+    }
 
     let win = Window {
         window: real_window,
