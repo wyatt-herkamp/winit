@@ -253,12 +253,7 @@ impl Menu {
         }
     }
 
-    pub fn add_item<S: Into<String>, H: Into<Option<Hotkey>>>(
-        &mut self,
-        id: u16,
-        name: S,
-        key: H,
-    ) {
+    pub fn add_item<S: Into<String>, H: Into<Option<Hotkey>>>(&mut self, id: u16, name: S, key: H) {
         autoreleasepool(|| unsafe {
             let title = NSString::alloc(nil).init_str(&name.into());
             let (key, mask) = match key.into() {

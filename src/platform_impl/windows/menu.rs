@@ -24,7 +24,7 @@ impl Hotkey {
         Self { modifiers, key }
     }
 
-    fn parse(&self) -> String{
+    fn parse(&self) -> String {
         let mut string = String::new();
         if self.modifiers.logo() {
             string.push_str("Windows+");
@@ -38,7 +38,7 @@ impl Hotkey {
         if self.modifiers.alt() {
             string.push_str("Alt+");
         }
-        
+
         let converted = match self.key {
             VirtualKeyCode::Key1 => "1",
             VirtualKeyCode::Key2 => "2",
@@ -50,7 +50,7 @@ impl Hotkey {
             VirtualKeyCode::Key8 => "8",
             VirtualKeyCode::Key9 => "9",
             VirtualKeyCode::Key0 => "0",
-        
+
             VirtualKeyCode::A => "A",
             VirtualKeyCode::B => "B",
             VirtualKeyCode::C => "C",
@@ -77,9 +77,9 @@ impl Hotkey {
             VirtualKeyCode::X => "X",
             VirtualKeyCode::Y => "Y",
             VirtualKeyCode::Z => "Z",
-        
+
             VirtualKeyCode::Escape => "Esc",
-        
+
             VirtualKeyCode::F1 => "F1",
             VirtualKeyCode::F2 => "F2",
             VirtualKeyCode::F3 => "F3",
@@ -104,31 +104,31 @@ impl Hotkey {
             VirtualKeyCode::F22 => "F22",
             VirtualKeyCode::F23 => "F23",
             VirtualKeyCode::F24 => "F24",
-        
+
             VirtualKeyCode::Snapshot => "PrtScn",
             VirtualKeyCode::Scroll => "ScrLk",
             VirtualKeyCode::Pause => "Pause",
-        
+
             VirtualKeyCode::Insert => "Ins",
             VirtualKeyCode::Home => "Home",
             VirtualKeyCode::Delete => "Del",
             VirtualKeyCode::End => "End",
             VirtualKeyCode::PageDown => "PgDn",
             VirtualKeyCode::PageUp => "PgUp",
-        
+
             VirtualKeyCode::Left => "Left",
             VirtualKeyCode::Up => "Up",
             VirtualKeyCode::Right => "Right",
             VirtualKeyCode::Down => "Down",
-        
+
             VirtualKeyCode::Back => "Backspace",
             VirtualKeyCode::Return => "Enter",
             VirtualKeyCode::Space => "Space",
-        
+
             VirtualKeyCode::Compose => "Compose",
-        
+
             VirtualKeyCode::Caret => "^",
-        
+
             VirtualKeyCode::Numlock => "NumLk",
             VirtualKeyCode::Numpad0 => "Numpad0",
             VirtualKeyCode::Numpad1 => "Numpad1",
@@ -148,7 +148,7 @@ impl Hotkey {
             VirtualKeyCode::NumpadEquals => "=",
             VirtualKeyCode::NumpadMultiply => "*",
             VirtualKeyCode::NumpadSubtract => "-",
-        
+
             VirtualKeyCode::AbntC1 => "AbntC1",
             VirtualKeyCode::AbntC2 => "AbntC2",
             VirtualKeyCode::Apostrophe => "'",
@@ -177,10 +177,10 @@ impl Hotkey {
             VirtualKeyCode::Minus => "Minus",
             VirtualKeyCode::Mute => "Mute",
             VirtualKeyCode::MyComputer => "MyComputer",
-        
+
             VirtualKeyCode::NavigateForward => "Next",
             VirtualKeyCode::NavigateBackward => "Prior",
-        
+
             VirtualKeyCode::NextTrack => "NextTrack",
             VirtualKeyCode::NoConvert => "NoConvert",
             VirtualKeyCode::OEM102 => "OEM102",
@@ -217,9 +217,9 @@ impl Hotkey {
             VirtualKeyCode::Paste => "Paste",
             VirtualKeyCode::Cut => "Cut",
         };
-        
+
         string.push_str(converted);
-        
+
         string
     }
 }
@@ -242,12 +242,7 @@ impl Menu {
         }
     }
 
-    pub fn add_item<S: Into<String>, H: Into<Option<Hotkey>>>(
-        &mut self,
-        id: u16,
-        name: S,
-        key: H,
-    ) {
+    pub fn add_item<S: Into<String>, H: Into<Option<Hotkey>>>(&mut self, id: u16, name: S, key: H) {
         let content = if let Some(key) = key.into() {
             if let Some(accel) = Accelerator::parse(&key, id) {
                 self.accelerators.insert(key, accel);
