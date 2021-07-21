@@ -185,6 +185,7 @@ Legend:
 |Exclusive fullscreen             |✔️     |✔️     |✔️         |**N/A**         |❌    |✔️     |**N/A**|
 |HiDPI support                    |✔️     |✔️     |✔️         |✔️             |▢[#721]|✔️    |✔️    |
 |Popup windows                    |❌     |❌     |❌         |❌             |❌    |❌     |**N/A**|
+|Native Menu                    |✔️     |✔️     |❌         |❌             |**N/A**|**N/A**|**N/A**|
 
 ### System information
 |Feature          |Windows|MacOS |Linux x11|Linux Wayland|Android|iOS      |WASM      |
