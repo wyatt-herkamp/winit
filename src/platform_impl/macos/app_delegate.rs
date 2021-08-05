@@ -163,7 +163,7 @@ extern "C" fn handle_menu(_this: &Object, _cmd: Sel, item: id) {
     unsafe {
         let id: isize = msg_send![item, tag];
 
-        if let Ok(id) = u32::try_from(id) {
+        if let Ok(id) = u16::try_from(id) {
             AppState::queue_event(EventWrapper::StaticEvent(Event::WindowEvent {
                 window_id: WindowId(window::Id(0)),
                 event: WindowEvent::MenuEntryActivated(id),

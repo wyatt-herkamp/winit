@@ -16,7 +16,10 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
-use winapi::shared::basetsd::{DWORD_PTR, UINT_PTR};
+use winapi::{
+    shared::basetsd::{DWORD_PTR, UINT_PTR},
+    um::winuser::TranslateAcceleratorW,
+};
 
 use winapi::{
     shared::{
@@ -41,6 +44,7 @@ use crate::{
         dpi::{become_dpi_aware, dpi_to_scale_factor, enable_non_client_dpi_scaling},
         drop_handler::FileDropHandler,
         event::{self, handle_extended_keys, process_key_params, vkey_to_winit_vkey},
+        menu,
         monitor::{self, MonitorHandle},
         raw_input, util,
         window_state::{CursorFlags, WindowFlags, WindowState},
@@ -217,8 +221,13 @@ impl<T: 'static> EventLoop<T> {
                 if 0 == winuser::GetMessageW(&mut msg, ptr::null_mut(), 0, 0) {
                     break 'main;
                 }
-                winuser::TranslateMessage(&mut msg);
-                winuser::DispatchMessageW(&mut msg);
+                let translated = menu::ACCELS.lock().as_ref().map_or(false, |table| {
+                    TranslateAcceleratorW(msg.hwnd, table.raw, &mut msg) != 0
+                });
+                if !translated {
+                    winuser::TranslateMessage(&mut msg);
+                    winuser::DispatchMessageW(&mut msg);
+                }
 
                 if let Err(payload) = runner.take_panic_error() {
                     runner.reset_runner();
@@ -861,7 +870,7 @@ unsafe fn public_window_callback_inner<T: 'static>(
 
         winuser::WM_COMMAND => {
             use crate::event::WindowEvent::MenuEntryActivated;
-            let id = LOWORD(wparam as DWORD) as u32;
+            let id = LOWORD(wparam as DWORD);
 
             subclass_input.send_event(Event::WindowEvent {
                 window_id: RootWindowId(WindowId(window)),

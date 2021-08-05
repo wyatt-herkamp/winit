@@ -2,6 +2,8 @@
 
 - **Breaking:** On Web, remove the `stdweb` backend.
 - Added `Window::focus_window`to bring the window to the front and set input focus.
+- On Windows and macOS, added a `Menu` (blanket implementations for other platforms)
+- Added a `Hotkey` struct (that is used by the `Menu` API)
 
 # 0.25.0 (2021-05-15)
 

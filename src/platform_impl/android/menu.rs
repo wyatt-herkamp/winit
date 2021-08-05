@@ -12,28 +12,6 @@ impl Hotkey {
     }
 }
 
-impl From<Hotkey> for String {
-    fn from(hotkey: Hotkey) -> Self {
-        let mut string = String::new();
-        if hotkey.modifiers.logo() {
-            string.push_str("Super+");
-        }
-        if hotkey.modifiers.ctrl() {
-            string.push_str("Ctrl+");
-        }
-        if hotkey.modifiers.shift() {
-            string.push_str("Shift+");
-        }
-        if hotkey.modifiers.alt() {
-            string.push_str("Alt+");
-        }
-
-        string.push_str(&String::from(hotkey.key));
-
-        string
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct Menu;
 
