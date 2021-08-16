@@ -22,7 +22,7 @@ impl Menu {
 
     pub fn add_item<S: Into<String>, H: Into<Option<Hotkey>>>(
         &mut self,
-        _id: usize,
+        _id: u16,
         _name: S,
         _key: H,
     ) {
