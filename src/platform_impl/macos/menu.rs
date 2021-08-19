@@ -59,6 +59,12 @@ impl Hotkey {
             VirtualKeyCode::Y => 'y',
             VirtualKeyCode::Z => 'z',
 
+            VirtualKeyCode::Comma => ',',
+            VirtualKeyCode::Period => '.',
+            VirtualKeyCode::Plus => '+',
+            VirtualKeyCode::Minus => '-',
+            VirtualKeyCode::Equals => '=',
+
             VirtualKeyCode::F1 => '\u{f704}',
             VirtualKeyCode::F2 => '\u{f705}',
             VirtualKeyCode::F3 => '\u{f706}',
@@ -106,6 +112,7 @@ impl Hotkey {
             VirtualKeyCode::Return => '\u{000d}',
             VirtualKeyCode::Space => '\u{0020}',
             VirtualKeyCode::Escape => '\u{001b}',
+
             _ => ' ',
         };
 
