@@ -11,7 +11,7 @@ use std::os::raw;
 use std::{ptr, sync::Arc};
 
 use crate::{
-    event_loop::{EventLoop, EventLoopWindowTarget},
+    event_loop::{EventLoopBuilder, EventLoopWindowTarget},
     monitor::MonitorHandle,
     window::{Window, WindowBuilder},
 };
@@ -19,9 +19,9 @@ use crate::{
 #[cfg(feature = "x11")]
 use crate::dpi::Size;
 #[cfg(feature = "x11")]
-use crate::platform_impl::x11::{ffi::XVisualInfo, XConnection};
+use crate::platform_impl::{x11::ffi::XVisualInfo, x11::XConnection, XLIB_ERROR_HOOKS};
 use crate::platform_impl::{
-    EventLoop as LinuxEventLoop, EventLoopWindowTarget as LinuxEventLoopWindowTarget,
+    ApplicationName, Backend, EventLoopWindowTarget as LinuxEventLoopWindowTarget,
     Window as LinuxWindow,
 };
 
@@ -32,13 +32,41 @@ pub use crate::platform_impl::x11;
 #[cfg(feature = "x11")]
 pub use crate::platform_impl::{x11::util::WindowType as XWindowType, XNotSupported};
 
-/// Additional methods on `EventLoopWindowTarget` that are specific to Unix.
+#[cfg(feature = "wayland")]
+pub use crate::window::Theme;
+
+/// The first argument in the provided hook will be the pointer to `XDisplay`
+/// and the second one the pointer to [`XErrorEvent`]. The returned `bool` is an
+/// indicator whether the error was handled by the callback.
+///
+/// [`XErrorEvent`]: https://linux.die.net/man/3/xerrorevent
+#[cfg(feature = "x11")]
+pub type XlibErrorHook =
+    Box<dyn Fn(*mut std::ffi::c_void, *mut std::ffi::c_void) -> bool + Send + Sync>;
+
+/// Hook to winit's xlib error handling callback.
+///
+/// This method is provided as a safe way to handle the errors comming from X11 when using xlib
+/// in external crates, like glutin for GLX access. Trying to handle errors by speculating with
+/// `XSetErrorHandler` is [`unsafe`].
+///
+/// [`unsafe`]: https://www.remlab.net/op/xlib.shtml
+#[inline]
+#[cfg(feature = "x11")]
+pub fn register_xlib_error_hook(hook: XlibErrorHook) {
+    // Append new hook.
+    unsafe {
+        XLIB_ERROR_HOOKS.lock().push(hook);
+    }
+}
+
+/// Additional methods on [`EventLoopWindowTarget`] that are specific to Unix.
 pub trait EventLoopWindowTargetExtUnix {
-    /// True if the `EventLoopWindowTarget` uses Wayland.
+    /// True if the [`EventLoopWindowTarget`] uses Wayland.
     #[cfg(feature = "wayland")]
     fn is_wayland(&self) -> bool;
 
-    /// True if the `EventLoopWindowTarget` uses X11.
+    /// True if the [`EventLoopWindowTarget`] uses X11.
     #[cfg(feature = "x11")]
     fn is_x11(&self) -> bool;
 
@@ -47,11 +75,13 @@ pub trait EventLoopWindowTargetExtUnix {
     fn xlib_xconnection(&self) -> Option<Arc<XConnection>>;
 
     /// Returns a pointer to the `wl_display` object of wayland that is used by this
-    /// `EventLoopWindowTarget`.
+    /// [`EventLoopWindowTarget`].
     ///
-    /// Returns `None` if the `EventLoop` doesn't use wayland (if it uses xlib for example).
+    /// Returns `None` if the [`EventLoop`] doesn't use wayland (if it uses xlib for example).
     ///
-    /// The pointer will become invalid when the winit `EventLoop` is destroyed.
+    /// The pointer will become invalid when the winit [`EventLoop`] is destroyed.
+    ///
+    /// [`EventLoop`]: crate::event_loop::EventLoop
     #[cfg(feature = "wayland")]
     fn wayland_display(&self) -> Option<*mut raw::c_void>;
 }
@@ -70,7 +100,6 @@ impl<T> EventLoopWindowTargetExtUnix for EventLoopWindowTarget<T> {
     }
 
     #[inline]
-    #[doc(hidden)]
     #[cfg(feature = "x11")]
     fn xlib_xconnection(&self) -> Option<Arc<XConnection>> {
         match self.p {
@@ -93,106 +122,48 @@ impl<T> EventLoopWindowTargetExtUnix for EventLoopWindowTarget<T> {
     }
 }
 
-/// Additional methods on `EventLoop` that are specific to Unix.
-pub trait EventLoopExtUnix {
-    /// Builds a new `EventLoop` that is forced to use X11.
-    ///
-    /// # Panics
-    ///
-    /// If called outside the main thread. To initialize an X11 event loop outside
-    /// the main thread, use [`new_x11_any_thread`](#tymethod.new_x11_any_thread).
+/// Additional methods on [`EventLoopBuilder`] that are specific to Unix.
+pub trait EventLoopBuilderExtUnix {
+    /// Force using X11.
     #[cfg(feature = "x11")]
-    fn new_x11() -> Result<Self, XNotSupported>
-    where
-        Self: Sized;
+    fn with_x11(&mut self) -> &mut Self;
 
-    /// Builds a new `EventLoop` that is forced to use Wayland.
-    ///
-    /// # Panics
-    ///
-    /// If called outside the main thread. To initialize a Wayland event loop outside
-    /// the main thread, use [`new_wayland_any_thread`](#tymethod.new_wayland_any_thread).
+    /// Force using Wayland.
     #[cfg(feature = "wayland")]
-    fn new_wayland() -> Self
-    where
-        Self: Sized;
+    fn with_wayland(&mut self) -> &mut Self;
 
-    /// Builds a new `EventLoop` on any thread.
+    /// Whether to allow the event loop to be created off of the main thread.
     ///
-    /// This method bypasses the cross-platform compatibility requirement
-    /// that `EventLoop` be created on the main thread.
-    fn new_any_thread() -> Self
-    where
-        Self: Sized;
-
-    /// Builds a new X11 `EventLoop` on any thread.
-    ///
-    /// This method bypasses the cross-platform compatibility requirement
-    /// that `EventLoop` be created on the main thread.
-    #[cfg(feature = "x11")]
-    fn new_x11_any_thread() -> Result<Self, XNotSupported>
-    where
-        Self: Sized;
-
-    /// Builds a new Wayland `EventLoop` on any thread.
-    ///
-    /// This method bypasses the cross-platform compatibility requirement
-    /// that `EventLoop` be created on the main thread.
-    #[cfg(feature = "wayland")]
-    fn new_wayland_any_thread() -> Self
-    where
-        Self: Sized;
+    /// By default, the window is only allowed to be created on the main
+    /// thread, to make platform compatibility easier.
+    fn with_any_thread(&mut self, any_thread: bool) -> &mut Self;
 }
 
-fn wrap_ev<T>(event_loop: LinuxEventLoop<T>) -> EventLoop<T> {
-    EventLoop {
-        event_loop,
-        _marker: std::marker::PhantomData,
+impl<T> EventLoopBuilderExtUnix for EventLoopBuilder<T> {
+    #[inline]
+    #[cfg(feature = "x11")]
+    fn with_x11(&mut self) -> &mut Self {
+        self.platform_specific.forced_backend = Some(Backend::X);
+        self
+    }
+
+    #[inline]
+    #[cfg(feature = "wayland")]
+    fn with_wayland(&mut self) -> &mut Self {
+        self.platform_specific.forced_backend = Some(Backend::Wayland);
+        self
+    }
+
+    #[inline]
+    fn with_any_thread(&mut self, any_thread: bool) -> &mut Self {
+        self.platform_specific.any_thread = any_thread;
+        self
     }
 }
 
-impl<T> EventLoopExtUnix for EventLoop<T> {
-    #[inline]
-    fn new_any_thread() -> Self {
-        wrap_ev(LinuxEventLoop::new_any_thread())
-    }
-
-    #[inline]
-    #[cfg(feature = "x11")]
-    fn new_x11_any_thread() -> Result<Self, XNotSupported> {
-        LinuxEventLoop::new_x11_any_thread().map(wrap_ev)
-    }
-
-    #[inline]
-    #[cfg(feature = "wayland")]
-    fn new_wayland_any_thread() -> Self {
-        wrap_ev(
-            LinuxEventLoop::new_wayland_any_thread()
-                // TODO: propagate
-                .expect("failed to open Wayland connection"),
-        )
-    }
-
-    #[inline]
-    #[cfg(feature = "x11")]
-    fn new_x11() -> Result<Self, XNotSupported> {
-        LinuxEventLoop::new_x11().map(wrap_ev)
-    }
-
-    #[inline]
-    #[cfg(feature = "wayland")]
-    fn new_wayland() -> Self {
-        wrap_ev(
-            LinuxEventLoop::new_wayland()
-                // TODO: propagate
-                .expect("failed to open Wayland connection"),
-        )
-    }
-}
-
-/// Additional methods on `Window` that are specific to Unix.
+/// Additional methods on [`Window`] that are specific to Unix.
 pub trait WindowExtUnix {
-    /// Returns the ID of the `Window` xlib object that is used by this window.
+    /// Returns the ID of the [`Window`] xlib object that is used by this window.
     ///
     /// Returns `None` if the window doesn't use xlib (if it uses wayland for example).
     #[cfg(feature = "x11")]
@@ -202,7 +173,7 @@ pub trait WindowExtUnix {
     ///
     /// Returns `None` if the window doesn't use xlib (if it uses wayland for example).
     ///
-    /// The pointer will become invalid when the glutin `Window` is destroyed.
+    /// The pointer will become invalid when the [`Window`] is destroyed.
     #[cfg(feature = "x11")]
     fn xlib_display(&self) -> Option<*mut raw::c_void>;
 
@@ -217,7 +188,7 @@ pub trait WindowExtUnix {
     ///
     /// Returns `None` if the window doesn't use xlib (if it uses wayland for example).
     ///
-    /// The pointer will become invalid when the glutin `Window` is destroyed.
+    /// The pointer will become invalid when the [`Window`] is destroyed.
     #[cfg(feature = "x11")]
     fn xcb_connection(&self) -> Option<*mut raw::c_void>;
 
@@ -225,7 +196,7 @@ pub trait WindowExtUnix {
     ///
     /// Returns `None` if the window doesn't use wayland (if it uses xlib for example).
     ///
-    /// The pointer will become invalid when the glutin `Window` is destroyed.
+    /// The pointer will become invalid when the [`Window`] is destroyed.
     #[cfg(feature = "wayland")]
     fn wayland_surface(&self) -> Option<*mut raw::c_void>;
 
@@ -233,16 +204,23 @@ pub trait WindowExtUnix {
     ///
     /// Returns `None` if the window doesn't use wayland (if it uses xlib for example).
     ///
-    /// The pointer will become invalid when the glutin `Window` is destroyed.
+    /// The pointer will become invalid when the [`Window`] is destroyed.
     #[cfg(feature = "wayland")]
     fn wayland_display(&self) -> Option<*mut raw::c_void>;
+
+    /// Updates [`Theme`] of window decorations.
+    ///
+    /// You can also use `WINIT_WAYLAND_CSD_THEME` env variable to set the theme.
+    /// Possible values for env variable are: "dark" and light"
+    #[cfg(feature = "wayland")]
+    fn wayland_set_csd_theme(&self, config: Theme);
 
     /// Check if the window is ready for drawing
     ///
     /// It is a remnant of a previous implementation detail for the
     /// wayland backend, and is no longer relevant.
     ///
-    /// Always return true.
+    /// Always return `true`.
     #[deprecated]
     fn is_ready(&self) -> bool;
 }
@@ -279,7 +257,6 @@ impl WindowExtUnix for Window {
     }
 
     #[inline]
-    #[doc(hidden)]
     #[cfg(feature = "x11")]
     fn xlib_xconnection(&self) -> Option<Arc<XConnection>> {
         match self.window {
@@ -320,44 +297,89 @@ impl WindowExtUnix for Window {
     }
 
     #[inline]
+    #[cfg(feature = "wayland")]
+    fn wayland_set_csd_theme(&self, theme: Theme) {
+        match self.window {
+            LinuxWindow::Wayland(ref w) => w.set_csd_theme(theme),
+            #[cfg(feature = "x11")]
+            _ => {}
+        }
+    }
+
+    #[inline]
     fn is_ready(&self) -> bool {
         true
     }
 }
 
-/// Additional methods on `WindowBuilder` that are specific to Unix.
+/// Additional methods on [`WindowBuilder`] that are specific to Unix.
 pub trait WindowBuilderExtUnix {
     #[cfg(feature = "x11")]
     fn with_x11_visual<T>(self, visual_infos: *const T) -> Self;
+
     #[cfg(feature = "x11")]
     fn with_x11_screen(self, screen_id: i32) -> Self;
 
-    /// Build window with `WM_CLASS` hint; defaults to the name of the binary. Only relevant on X11.
-    #[cfg(feature = "x11")]
-    fn with_class(self, class: String, instance: String) -> Self;
-    /// Build window with override-redirect flag; defaults to false. Only relevant on X11.
-    #[cfg(feature = "x11")]
-    fn with_override_redirect(self, override_redirect: bool) -> Self;
-    /// Build window with `_NET_WM_WINDOW_TYPE` hints; defaults to `Normal`. Only relevant on X11.
-    #[cfg(feature = "x11")]
-    fn with_x11_window_type(self, x11_window_type: Vec<XWindowType>) -> Self;
-    /// Build window with `_GTK_THEME_VARIANT` hint set to the specified value. Currently only relevant on X11.
-    #[cfg(feature = "x11")]
-    fn with_gtk_theme_variant(self, variant: String) -> Self;
-    /// Build window with resize increment hint. Only implemented on X11.
-    #[cfg(feature = "x11")]
-    fn with_resize_increments<S: Into<Size>>(self, increments: S) -> Self;
-    /// Build window with base size hint. Only implemented on X11.
-    #[cfg(feature = "x11")]
-    fn with_base_size<S: Into<Size>>(self, base_size: S) -> Self;
-
-    /// Build window with a given application ID. It should match the `.desktop` file distributed with
-    /// your program. Only relevant on Wayland.
+    /// Build window with the given `general` and `instance` names.
+    ///
+    /// On Wayland, the `general` name sets an application ID, which should match the `.desktop`
+    /// file destributed with your program. The `instance` is a `no-op`.
+    ///
+    /// On X11, the `general` sets general class of `WM_CLASS(STRING)`, while `instance` set the
+    /// instance part of it. The resulted property looks like `WM_CLASS(STRING) = "general", "instance"`.
     ///
     /// For details about application ID conventions, see the
     /// [Desktop Entry Spec](https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html#desktop-file-id)
+    fn with_name(self, general: impl Into<String>, instance: impl Into<String>) -> Self;
+
+    /// Build window with override-redirect flag; defaults to false. Only relevant on X11.
+    #[cfg(feature = "x11")]
+    fn with_override_redirect(self, override_redirect: bool) -> Self;
+
+    /// Build window with `_NET_WM_WINDOW_TYPE` hints; defaults to `Normal`. Only relevant on X11.
+    #[cfg(feature = "x11")]
+    fn with_x11_window_type(self, x11_window_type: Vec<XWindowType>) -> Self;
+
+    /// Build window with `_GTK_THEME_VARIANT` hint set to the specified value. Currently only relevant on X11.
+    #[cfg(feature = "x11")]
+    fn with_gtk_theme_variant(self, variant: String) -> Self;
+
+    /// Build window with certain decoration [`Theme`]
+    ///
+    /// You can also use `WINIT_WAYLAND_CSD_THEME` env variable to set the theme.
+    /// Possible values for env variable are: "dark" and light"
     #[cfg(feature = "wayland")]
-    fn with_app_id(self, app_id: String) -> Self;
+    fn with_wayland_csd_theme(self, theme: Theme) -> Self;
+
+    /// Build window with resize increment hint. Only implemented on X11.
+    ///
+    /// ```
+    /// # use winit::dpi::{LogicalSize, PhysicalSize};
+    /// # use winit::window::WindowBuilder;
+    /// # use winit::platform::unix::WindowBuilderExtUnix;
+    /// // Specify the size in logical dimensions like this:
+    /// WindowBuilder::new().with_resize_increments(LogicalSize::new(400.0, 200.0));
+    ///
+    /// // Or specify the size in physical dimensions like this:
+    /// WindowBuilder::new().with_resize_increments(PhysicalSize::new(400, 200));
+    /// ```
+    #[cfg(feature = "x11")]
+    fn with_resize_increments<S: Into<Size>>(self, increments: S) -> Self;
+
+    /// Build window with base size hint. Only implemented on X11.
+    ///
+    /// ```
+    /// # use winit::dpi::{LogicalSize, PhysicalSize};
+    /// # use winit::window::WindowBuilder;
+    /// # use winit::platform::unix::WindowBuilderExtUnix;
+    /// // Specify the size in logical dimensions like this:
+    /// WindowBuilder::new().with_base_size(LogicalSize::new(400.0, 200.0));
+    ///
+    /// // Or specify the size in physical dimensions like this:
+    /// WindowBuilder::new().with_base_size(PhysicalSize::new(400, 200));
+    /// ```
+    #[cfg(feature = "x11")]
+    fn with_base_size<S: Into<Size>>(self, base_size: S) -> Self;
 }
 
 impl WindowBuilderExtUnix for WindowBuilder {
@@ -379,9 +401,8 @@ impl WindowBuilderExtUnix for WindowBuilder {
     }
 
     #[inline]
-    #[cfg(feature = "x11")]
-    fn with_class(mut self, instance: String, class: String) -> Self {
-        self.platform_specific.class = Some((instance, class));
+    fn with_name(mut self, general: impl Into<String>, instance: impl Into<String>) -> Self {
+        self.platform_specific.name = Some(ApplicationName::new(general.into(), instance.into()));
         self
     }
 
@@ -407,6 +428,13 @@ impl WindowBuilderExtUnix for WindowBuilder {
     }
 
     #[inline]
+    #[cfg(feature = "wayland")]
+    fn with_wayland_csd_theme(mut self, theme: Theme) -> Self {
+        self.platform_specific.csd_theme = Some(theme);
+        self
+    }
+
+    #[inline]
     #[cfg(feature = "x11")]
     fn with_resize_increments<S: Into<Size>>(mut self, increments: S) -> Self {
         self.platform_specific.resize_increments = Some(increments.into());
@@ -417,13 +445,6 @@ impl WindowBuilderExtUnix for WindowBuilder {
     #[cfg(feature = "x11")]
     fn with_base_size<S: Into<Size>>(mut self, base_size: S) -> Self {
         self.platform_specific.base_size = Some(base_size.into());
-        self
-    }
-
-    #[inline]
-    #[cfg(feature = "wayland")]
-    fn with_app_id(mut self, app_id: String) -> Self {
-        self.platform_specific.app_id = Some(app_id);
         self
     }
 }

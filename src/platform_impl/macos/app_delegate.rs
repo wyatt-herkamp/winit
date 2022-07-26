@@ -6,10 +6,9 @@ use objc::{
     declare::ClassDecl,
     runtime::{Class, Object, Sel},
 };
-use std::{
-    cell::{RefCell, RefMut},
-    os::raw::c_void,
-};
+use once_cell::sync::Lazy;
+
+use crate::{platform_impl::platform::app_state::AppState};
 
 static AUX_DELEGATE_STATE_NAME: &str = "auxState";
 
@@ -18,8 +17,7 @@ pub struct AuxDelegateState {
     /// after the app has finished launching. If the activation policy is set earlier, the
     /// menubar is initially unresponsive on macOS 10.15 for example.
     pub activation_policy: ActivationPolicy,
-
-    pub create_default_menu: bool,
+    pub default_menu: bool,
 }
 
 /// Apple constants
@@ -61,6 +59,16 @@ lazy_static! {
                     _reply: u64,
                 ),
         );
+    decl.add_method(
+        sel!(applicationDidFinishLaunching:),
+        did_finish_launching as extern "C" fn(&Object, Sel, id),
+    );
+    decl.add_method(
+        sel!(applicationWillTerminate:),
+        will_terminate as extern "C" fn(&Object, Sel, id),
+    );
+
+    decl.add_ivar::<*mut c_void>(AUX_DELEGATE_STATE_NAME);
 
         AppDelegateClass(decl.register())
     };
@@ -77,11 +85,12 @@ extern "C" fn new(class: &Class, _: Sel) -> id {
     unsafe {
         let this: id = msg_send![class, alloc];
         let this: id = msg_send![this, init];
+        // TODO: Remove the need for this initialization here
         (*this).set_ivar(
             AUX_DELEGATE_STATE_NAME,
             Box::into_raw(Box::new(RefCell::new(AuxDelegateState {
                 activation_policy: ActivationPolicy::Regular,
-                create_default_menu: true,
+                default_menu: true,
             }))) as *mut c_void,
         );
         this
@@ -149,7 +158,13 @@ extern "C" fn will_finish_launching(this: &Object, _: Sel, _: id) {
 }
 
 extern "C" fn did_finish_launching(this: &Object, _: Sel, _: id) {
-    trace!("Triggered `applicationDidFinishLaunching`");
+    trace_scope!("applicationDidFinishLaunching:");
     AppState::launched(this);
-    trace!("Completed `applicationDidFinishLaunching`");
+}
+
+extern "C" fn will_terminate(_this: &Object, _: Sel, _: id) {
+    trace!("Triggered `applicationWillTerminate`");
+    // TODO: Notify every window that it will be destroyed, like done in iOS?
+    AppState::exit();
+    trace!("Completed `applicationWillTerminate`");
 }

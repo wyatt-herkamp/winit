@@ -99,7 +99,8 @@ pub type CFRunLoopTimerCallBack = extern "C" fn(timer: CFRunLoopTimerRef, info: 
 pub enum CFRunLoopTimerContext {}
 
 /// This mirrors the struct with the same name from Core Foundation.
-/// https://developer.apple.com/documentation/corefoundation/cfrunloopobservercontext?language=objc
+///
+/// <https://developer.apple.com/documentation/corefoundation/cfrunloopobservercontext?language=objc>
 #[allow(non_snake_case)]
 #[repr(C)]
 pub struct CFRunLoopObserverContext {
@@ -139,7 +140,10 @@ where
     // However we want to keep that weak reference around after the function.
     std::mem::forget(info_from_raw);
 
-    stop_app_on_panic(Weak::clone(&panic_info), move || f(panic_info.0));
+    stop_app_on_panic(Weak::clone(&panic_info), move || {
+        let _ = &panic_info;
+        f(panic_info.0)
+    });
 }
 
 // begin is queued with the highest priority to ensure it is processed before other observers

@@ -1,5 +1,9 @@
-//! The `Window` struct and associated types.
+//! The [`Window`] struct and associated types.
 use std::fmt;
+
+use raw_window_handle::{
+    HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle,
+};
 
 use crate::{
     dpi::{PhysicalPosition, PhysicalSize, Position, Size},
@@ -18,7 +22,7 @@ pub use crate::icon::{BadIcon, Icon};
 /// ```no_run
 /// use winit::{
 ///     event::{Event, WindowEvent},
-///     event_loop::{ControlFlow, EventLoop},
+///     event_loop::EventLoop,
 ///     window::Window,
 /// };
 ///
@@ -26,13 +30,13 @@ pub use crate::icon::{BadIcon, Icon};
 /// let window = Window::new(&event_loop).unwrap();
 ///
 /// event_loop.run(move |event, _, control_flow| {
-///     *control_flow = ControlFlow::Wait;
+///     control_flow.set_wait();
 ///
 ///     match event {
 ///         Event::WindowEvent {
 ///             event: WindowEvent::CloseRequested,
 ///             ..
-///         } => *control_flow = ControlFlow::Exit,
+///         } => control_flow.set_exit(),
 ///         _ => (),
 ///     }
 /// });
@@ -61,7 +65,7 @@ impl Drop for Window {
 
 /// Identifier of a window. Unique for each window.
 ///
-/// Can be obtained with `window.id()`.
+/// Can be obtained with [`window.id()`](`Window::id`).
 ///
 /// Whenever you receive an event specific to a window, this event contains a `WindowId` which you
 /// can then compare to the ids of your windows.
@@ -69,13 +73,13 @@ impl Drop for Window {
 pub struct WindowId(pub(crate) platform_impl::WindowId);
 
 impl WindowId {
-    /// Returns a dummy `WindowId`, useful for unit testing.
+    /// Returns a dummy id, useful for unit testing.
     ///
     /// # Safety
     ///
     /// The only guarantee made about the return value of this function is that
     /// it will always be equal to itself and to future values returned by this function.
-    /// No other guarantees are made. This may be equal to a real `WindowId`.
+    /// No other guarantees are made. This may be equal to a real [`WindowId`].
     ///
     /// **Passing this into a winit function will result in undefined behavior.**
     pub const unsafe fn dummy() -> Self {
@@ -83,11 +87,24 @@ impl WindowId {
     }
 }
 
-/// Object that allows you to build windows.
+impl From<WindowId> for u64 {
+    fn from(window_id: WindowId) -> Self {
+        window_id.0.into()
+    }
+}
+
+impl From<u64> for WindowId {
+    fn from(raw_id: u64) -> Self {
+        Self(raw_id.into())
+    }
+}
+
+/// Object that allows building windows.
 #[derive(Clone, Default)]
+#[must_use]
 pub struct WindowBuilder {
     /// The attributes to use to create the window.
-    pub window: WindowAttributes,
+    pub(crate) window: WindowAttributes,
 
     // Platform-specific configuration.
     pub(crate) platform_specific: platform_impl::PlatformSpecificWindowBuilderAttributes,
@@ -103,92 +120,19 @@ impl fmt::Debug for WindowBuilder {
 
 /// Attributes to use when creating a window.
 #[derive(Debug, Clone)]
-pub struct WindowAttributes {
-    /// The dimensions of the window. If this is `None`, some platform-specific dimensions will be
-    /// used.
-    ///
-    /// The default is `None`.
+pub(crate) struct WindowAttributes {
     pub inner_size: Option<Size>,
-
-    /// The minimum dimensions a window can be, If this is `None`, the window will have no minimum dimensions (aside from reserved).
-    ///
-    /// The default is `None`.
     pub min_inner_size: Option<Size>,
-
-    /// The maximum dimensions a window can be, If this is `None`, the maximum will have no maximum or will be set to the primary monitor's dimensions by the platform.
-    ///
-    /// The default is `None`.
     pub max_inner_size: Option<Size>,
-
-    /// The desired position of the window. If this is `None`, some platform-specific position
-    /// will be chosen.
-    ///
-    /// The default is `None`.
-    ///
-    /// ## Platform-specific
-    ///
-    /// - **macOS**: The top left corner position of the window content, the window's "inner"
-    /// position. The window title bar will be placed above it.
-    /// The window will be positioned such that it fits on screen, maintaining
-    /// set `inner_size` if any.
-    /// If you need to precisely position the top left corner of the whole window you have to
-    /// use [`Window::set_outer_position`] after creating the window.
-    /// - **Windows**: The top left corner position of the window title bar, the window's "outer"
-    /// position.
-    /// There may be a small gap between this position and the window due to the specifics of the
-    /// Window Manager.
-    /// - **X11**: The top left corner of the window, the window's "outer" position.
-    /// - **Others**: Ignored.
-    ///
-    /// See [`Window::set_outer_position`].
-    ///
-    /// [`Window::set_outer_position`]: crate::window::Window::set_outer_position
     pub position: Option<Position>,
-
-    /// Whether the window is resizable or not.
-    ///
-    /// The default is `true`.
     pub resizable: bool,
-
-    /// Whether the window should be set as fullscreen upon creation.
-    ///
-    /// The default is `None`.
-    pub fullscreen: Option<Fullscreen>,
-
-    /// The title of the window in the title bar.
-    ///
-    /// The default is `"winit window"`.
     pub title: String,
-
-    /// Whether the window should be maximized upon creation.
-    ///
-    /// The default is `false`.
+    pub fullscreen: Option<Fullscreen>,
     pub maximized: bool,
-
-    /// Whether the window should be immediately visible upon creation.
-    ///
-    /// The default is `true`.
     pub visible: bool,
-
-    /// Whether the the window should be transparent. If this is true, writing colors
-    /// with alpha values different than `1.0` will produce a transparent window.
-    ///
-    /// The default is `false`.
     pub transparent: bool,
-
-    /// Whether the window should have borders and bars.
-    ///
-    /// The default is `true`.
     pub decorations: bool,
-
-    /// Whether the window should always be on top of other windows.
-    ///
-    /// The default is `false`.
     pub always_on_top: bool,
-
-    /// The window icon.
-    ///
-    /// The default is `None`.
     pub window_icon: Option<Icon>,
 }
 
@@ -214,7 +158,7 @@ impl Default for WindowAttributes {
 }
 
 impl WindowBuilder {
-    /// Initializes a new `WindowBuilder` with default values.
+    /// Initializes a new builder with default values.
     #[inline]
     pub fn new() -> Self {
         Default::default()
@@ -222,31 +166,33 @@ impl WindowBuilder {
 
     /// Requests the window to be of specific dimensions.
     ///
-    /// See [`Window::set_inner_size`] for details.
+    /// If this is not set, some platform-specific dimensions will be used.
     ///
-    /// [`Window::set_inner_size`]: crate::window::Window::set_inner_size
+    /// See [`Window::set_inner_size`] for details.
     #[inline]
     pub fn with_inner_size<S: Into<Size>>(mut self, size: S) -> Self {
         self.window.inner_size = Some(size.into());
         self
     }
 
-    /// Sets a minimum dimension size for the window.
+    /// Sets the minimum dimensions a window can have.
+    ///
+    /// If this is not set, the window will have no minimum dimensions (aside
+    /// from reserved).
     ///
     /// See [`Window::set_min_inner_size`] for details.
-    ///
-    /// [`Window::set_min_inner_size`]: crate::window::Window::set_min_inner_size
     #[inline]
     pub fn with_min_inner_size<S: Into<Size>>(mut self, min_size: S) -> Self {
         self.window.min_inner_size = Some(min_size.into());
         self
     }
 
-    /// Sets a maximum dimension size for the window.
+    /// Sets the maximum dimensions a window can have.
+    ///
+    /// If this is not set, the window will have no maximum or will be set to
+    /// the primary monitor's dimensions by the platform.
     ///
     /// See [`Window::set_max_inner_size`] for details.
-    ///
-    /// [`Window::set_max_inner_size`]: crate::window::Window::set_max_inner_size
     #[inline]
     pub fn with_max_inner_size<S: Into<Size>>(mut self, max_size: S) -> Self {
         self.window.max_inner_size = Some(max_size.into());
@@ -255,9 +201,26 @@ impl WindowBuilder {
 
     /// Sets a desired initial position for the window.
     ///
-    /// See [`WindowAttributes::position`] for details.
+    /// If this is not set, some platform-specific position will be chosen.
     ///
-    /// [`WindowAttributes::position`]: crate::window::WindowAttributes::position
+    /// See [`Window::set_outer_position`] for details.
+    ///
+    /// ## Platform-specific
+    ///
+    /// - **macOS:** The top left corner position of the window content, the
+    ///   window's "inner" position. The window title bar will be placed above
+    ///   it. The window will be positioned such that it fits on screen,
+    ///   maintaining set `inner_size` if any.
+    ///   If you need to precisely position the top left corner of the whole
+    ///   window you have to use [`Window::set_outer_position`] after creating
+    ///   the window.
+    /// - **Windows:** The top left corner position of the window title bar,
+    ///   the window's "outer" position.
+    ///   There may be a small gap between this position and the window due to
+    ///   the specifics of the Window Manager.
+    /// - **X11:** The top left corner of the window, the window's "outer"
+    ///   position.
+    /// - **Others:** Ignored.
     #[inline]
     pub fn with_position<P: Into<Position>>(mut self, position: P) -> Self {
         self.window.position = Some(position.into());
@@ -266,53 +229,53 @@ impl WindowBuilder {
 
     /// Sets whether the window is resizable or not.
     ///
-    /// See [`Window::set_resizable`] for details.
+    /// The default is `true`.
     ///
-    /// [`Window::set_resizable`]: crate::window::Window::set_resizable
+    /// See [`Window::set_resizable`] for details.
     #[inline]
     pub fn with_resizable(mut self, resizable: bool) -> Self {
         self.window.resizable = resizable;
         self
     }
 
-    /// Requests a specific title for the window.
+    /// Sets the initial title of the window in the title bar.
+    ///
+    /// The default is `"winit window"`.
     ///
     /// See [`Window::set_title`] for details.
-    ///
-    /// [`Window::set_title`]: crate::window::Window::set_title
     #[inline]
     pub fn with_title<T: Into<String>>(mut self, title: T) -> Self {
         self.window.title = title.into();
         self
     }
 
-    /// Sets the window fullscreen state.
+    /// Sets whether the window should be put into fullscreen upon creation.
+    ///
+    /// The default is `None`.
     ///
     /// See [`Window::set_fullscreen`] for details.
-    ///
-    /// [`Window::set_fullscreen`]: crate::window::Window::set_fullscreen
     #[inline]
     pub fn with_fullscreen(mut self, fullscreen: Option<Fullscreen>) -> Self {
         self.window.fullscreen = fullscreen;
         self
     }
 
-    /// Requests maximized mode.
+    /// Request that the window is maximized upon creation.
+    ///
+    /// The default is `false`.
     ///
     /// See [`Window::set_maximized`] for details.
-    ///
-    /// [`Window::set_maximized`]: crate::window::Window::set_maximized
     #[inline]
     pub fn with_maximized(mut self, maximized: bool) -> Self {
         self.window.maximized = maximized;
         self
     }
 
-    /// Sets whether the window will be initially hidden or visible.
+    /// Sets whether the window will be initially visible or hidden.
+    ///
+    /// The default is to show the window.
     ///
     /// See [`Window::set_visible`] for details.
-    ///
-    /// [`Window::set_visible`]: crate::window::Window::set_visible
     #[inline]
     pub fn with_visible(mut self, visible: bool) -> Self {
         self.window.visible = visible;
@@ -320,17 +283,28 @@ impl WindowBuilder {
     }
 
     /// Sets whether the background of the window should be transparent.
+    ///
+    /// If this is `true`, writing colors with alpha values different than
+    /// `1.0` will produce a transparent window.
+    ///
+    /// The default is `false`.
     #[inline]
     pub fn with_transparent(mut self, transparent: bool) -> Self {
         self.window.transparent = transparent;
         self
     }
 
+    /// Get whether the window will support transparency.
+    #[inline]
+    pub fn transparent(&self) -> bool {
+        self.window.transparent
+    }
+
     /// Sets whether the window should have a border, a title bar, etc.
     ///
-    /// See [`Window::set_decorations`] for details.
+    /// The default is `true`.
     ///
-    /// [`Window::set_decorations`]: crate::window::Window::set_decorations
+    /// See [`Window::set_decorations`] for details.
     #[inline]
     pub fn with_decorations(mut self, decorations: bool) -> Self {
         self.window.decorations = decorations;
@@ -339,9 +313,9 @@ impl WindowBuilder {
 
     /// Sets whether or not the window will always be on top of other windows.
     ///
-    /// See [`Window::set_always_on_top`] for details.
+    /// The default is `false`.
     ///
-    /// [`Window::set_always_on_top`]: crate::window::Window::set_always_on_top
+    /// See [`Window::set_always_on_top`] for details.
     #[inline]
     pub fn with_always_on_top(mut self, always_on_top: bool) -> Self {
         self.window.always_on_top = always_on_top;
@@ -350,9 +324,9 @@ impl WindowBuilder {
 
     /// Sets the window icon.
     ///
-    /// See [`Window::set_window_icon`] for details.
+    /// The default is `None`.
     ///
-    /// [`Window::set_window_icon`]: crate::window::Window::set_window_icon
+    /// See [`Window::set_window_icon`] for details.
     #[inline]
     pub fn with_window_icon(mut self, window_icon: Option<Icon>) -> Self {
         self.window.window_icon = window_icon;
@@ -363,9 +337,10 @@ impl WindowBuilder {
     ///
     /// Possible causes of error include denied permission, incompatible system, and lack of memory.
     ///
-    /// Platform-specific behavior:
-    /// - **Web**: The window is created but not inserted into the web page automatically. Please
-    /// see the web platform module for more information.
+    /// ## Platform-specific
+    ///
+    /// - **Web:** The window is created but not inserted into the web page automatically. Please
+    ///   see the web platform module for more information.
     #[inline]
     pub fn build<T: 'static>(
         self,
@@ -389,11 +364,12 @@ impl Window {
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
     ///  out of memory, etc.
     ///
-    /// Platform-specific behavior:
-    /// - **Web**: The window is created but not inserted into the web page automatically. Please
-    /// see the web platform module for more information.
+    /// ## Platform-specific
     ///
-    /// [`WindowBuilder::new().build(event_loop)`]: crate::window::WindowBuilder::build
+    /// - **Web:** The window is created but not inserted into the web page automatically. Please
+    ///   see the web platform module for more information.
+    ///
+    /// [`WindowBuilder::new().build(event_loop)`]: WindowBuilder::build
     #[inline]
     pub fn new<T: 'static>(event_loop: &EventLoopWindowTarget<T>) -> Result<Window, OsError> {
         let builder = WindowBuilder::new();
@@ -411,7 +387,7 @@ impl Window {
     /// See the [`dpi`](crate::dpi) module for more information.
     ///
     /// Note that this value can change depending on user action (for example if the window is
-    /// moved to another screen); as such, tracking `WindowEvent::ScaleFactorChanged` events is
+    /// moved to another screen); as such, tracking [`WindowEvent::ScaleFactorChanged`] events is
     /// the most robust way to track the DPI you need to use to draw.
     ///
     /// ## Platform-specific
@@ -421,19 +397,20 @@ impl Window {
     /// - **iOS:** Can only be called on the main thread. Returns the underlying `UIView`'s
     ///   [`contentScaleFactor`].
     ///
+    /// [`WindowEvent::ScaleFactorChanged`]: crate::event::WindowEvent::ScaleFactorChanged
     /// [`contentScaleFactor`]: https://developer.apple.com/documentation/uikit/uiview/1622657-contentscalefactor?language=objc
     #[inline]
     pub fn scale_factor(&self) -> f64 {
         self.window.scale_factor()
     }
 
-    /// Emits a `WindowEvent::RedrawRequested` event in the associated event loop after all OS
+    /// Emits a [`Event::RedrawRequested`] event in the associated event loop after all OS
     /// events have been processed by the event loop.
     ///
     /// This is the **strongly encouraged** method of redrawing windows, as it can integrate with
     /// OS-requested redraws (e.g. when a window gets resized).
     ///
-    /// This function can cause `RedrawRequested` events to be emitted after `Event::MainEventsCleared`
+    /// This function can cause `RedrawRequested` events to be emitted after [`Event::MainEventsCleared`]
     /// but before `Event::NewEvents` if called in the following circumstances:
     /// * While processing `MainEventsCleared`.
     /// * While processing a `RedrawRequested` event that was sent during `MainEventsCleared` or any
@@ -443,6 +420,9 @@ impl Window {
     ///
     /// - **iOS:** Can only be called on the main thread.
     /// - **Android:** Subsequent calls after `MainEventsCleared` are not handled.
+    ///
+    /// [`Event::RedrawRequested`]: crate::event::Event::RedrawRequested
+    /// [`Event::MainEventsCleared`]: crate::event::Event::MainEventsCleared
     #[inline]
     pub fn request_redraw(&self) {
         self.window.request_redraw()
@@ -454,14 +434,14 @@ impl Window {
     /// Returns the position of the top-left hand corner of the window's client area relative to the
     /// top-left hand corner of the desktop.
     ///
-    /// The same conditions that apply to `outer_position` apply to this method.
+    /// The same conditions that apply to [`Window::outer_position`] apply to this method.
     ///
     /// ## Platform-specific
     ///
     /// - **iOS:** Can only be called on the main thread. Returns the top left coordinates of the
     ///   window's [safe area] in the screen space coordinate system.
     /// - **Web:** Returns the top-left coordinates relative to the viewport. _Note: this returns the
-    ///    same value as `outer_position`._
+    ///    same value as [`Window::outer_position`]._
     /// - **Android / Wayland:** Always returns [`NotSupportedError`].
     ///
     /// [safe area]: https://developer.apple.com/documentation/uikit/uiview/2891103-safeareainsets?language=objc
@@ -471,14 +451,14 @@ impl Window {
     }
 
     /// Returns the position of the top-left hand corner of the window relative to the
-    ///  top-left hand corner of the desktop.
+    /// top-left hand corner of the desktop.
     ///
     /// Note that the top-left hand corner of the desktop is not necessarily the same as
-    ///  the screen. If the user uses a desktop with multiple monitors, the top-left hand corner
-    ///  of the desktop is the top-left hand corner of the monitor at the top-left of the desktop.
+    /// the screen. If the user uses a desktop with multiple monitors, the top-left hand corner
+    /// of the desktop is the top-left hand corner of the monitor at the top-left of the desktop.
     ///
     /// The coordinates can be negative if the top-left hand corner of the window is outside
-    ///  of the visible screen region.
+    /// of the visible screen region.
     ///
     /// ## Platform-specific
     ///
@@ -493,8 +473,21 @@ impl Window {
 
     /// Modifies the position of the window.
     ///
-    /// See `outer_position` for more information about the coordinates. This automatically un-maximizes the
-    /// window if it's maximized.
+    /// See [`Window::outer_position`] for more information about the coordinates.
+    /// This automatically un-maximizes the window if it's maximized.
+    ///
+    /// ```no_run
+    /// # use winit::dpi::{LogicalPosition, PhysicalPosition};
+    /// # use winit::event_loop::EventLoop;
+    /// # use winit::window::Window;
+    /// # let mut event_loop = EventLoop::new();
+    /// # let window = Window::new(&event_loop).unwrap();
+    /// // Specify the position in logical dimensions like this:
+    /// window.set_outer_position(LogicalPosition::new(400.0, 200.0));
+    ///
+    /// // Or specify the position in physical dimensions like this:
+    /// window.set_outer_position(PhysicalPosition::new(400, 200));
+    /// ```
     ///
     /// ## Platform-specific
     ///
@@ -525,8 +518,21 @@ impl Window {
 
     /// Modifies the inner size of the window.
     ///
-    /// See `inner_size` for more information about the values. This automatically un-maximizes the
-    /// window if it's maximized.
+    /// See [`Window::inner_size`] for more information about the values.
+    /// This automatically un-maximizes the window if it's maximized.
+    ///
+    /// ```no_run
+    /// # use winit::dpi::{LogicalSize, PhysicalSize};
+    /// # use winit::event_loop::EventLoop;
+    /// # use winit::window::Window;
+    /// # let mut event_loop = EventLoop::new();
+    /// # let window = Window::new(&event_loop).unwrap();
+    /// // Specify the size in logical dimensions like this:
+    /// window.set_inner_size(LogicalSize::new(400.0, 200.0));
+    ///
+    /// // Or specify the size in physical dimensions like this:
+    /// window.set_inner_size(PhysicalSize::new(400, 200));
+    /// ```
     ///
     /// ## Platform-specific
     ///
@@ -540,20 +546,33 @@ impl Window {
     /// Returns the physical size of the entire window.
     ///
     /// These dimensions include the title bar and borders. If you don't want that (and you usually don't),
-    /// use `inner_size` instead.
+    /// use [`Window::inner_size`] instead.
     ///
     /// ## Platform-specific
     ///
-    /// - **iOS:** Can only be called on the main thread. Returns the `PhysicalSize` of the window in
+    /// - **iOS:** Can only be called on the main thread. Returns the [`PhysicalSize`] of the window in
     ///   screen space coordinates.
     /// - **Web:** Returns the size of the canvas element. _Note: this returns the same value as
-    ///   `inner_size`._
+    ///   [`Window::inner_size`]._
     #[inline]
     pub fn outer_size(&self) -> PhysicalSize<u32> {
         self.window.outer_size()
     }
 
     /// Sets a minimum dimension size for the window.
+    ///
+    /// ```no_run
+    /// # use winit::dpi::{LogicalSize, PhysicalSize};
+    /// # use winit::event_loop::EventLoop;
+    /// # use winit::window::Window;
+    /// # let mut event_loop = EventLoop::new();
+    /// # let window = Window::new(&event_loop).unwrap();
+    /// // Specify the size in logical dimensions like this:
+    /// window.set_min_inner_size(Some(LogicalSize::new(400.0, 200.0)));
+    ///
+    /// // Or specify the size in physical dimensions like this:
+    /// window.set_min_inner_size(Some(PhysicalSize::new(400, 200)));
+    /// ```
     ///
     /// ## Platform-specific
     ///
@@ -564,6 +583,19 @@ impl Window {
     }
 
     /// Sets a maximum dimension size for the window.
+    ///
+    /// ```no_run
+    /// # use winit::dpi::{LogicalSize, PhysicalSize};
+    /// # use winit::event_loop::EventLoop;
+    /// # use winit::window::Window;
+    /// # let mut event_loop = EventLoop::new();
+    /// # let window = Window::new(&event_loop).unwrap();
+    /// // Specify the size in logical dimensions like this:
+    /// window.set_max_inner_size(Some(LogicalSize::new(400.0, 200.0)));
+    ///
+    /// // Or specify the size in physical dimensions like this:
+    /// window.set_max_inner_size(Some(PhysicalSize::new(400, 200)));
+    /// ```
     ///
     /// ## Platform-specific
     ///
@@ -589,6 +621,7 @@ impl Window {
     /// Modifies the window's visibility.
     ///
     /// If `false`, this will hide the window. If `true`, this will show the window.
+    ///
     /// ## Platform-specific
     ///
     /// - **Android / Wayland / Web:** Unsupported.
@@ -598,23 +631,47 @@ impl Window {
         self.window.set_visible(visible)
     }
 
+    /// Gets the window's current visibility state.
+    ///
+    /// `None` means it couldn't be determined, so it is not recommended to use this to drive your rendering backend.
+    ///
+    /// ## Platform-specific
+    ///
+    /// - **X11:** Not implemented.
+    /// - **Wayland / iOS / Android / Web:** Unsupported.
+    #[inline]
+    pub fn is_visible(&self) -> Option<bool> {
+        self.window.is_visible()
+    }
+
     /// Sets whether the window is resizable or not.
     ///
-    /// Note that making the window unresizable doesn't exempt you from handling `Resized`, as that event can still be
-    /// triggered by DPI scaling, entering fullscreen mode, etc.
+    /// Note that making the window unresizable doesn't exempt you from handling [`WindowEvent::Resized`], as that
+    /// event can still be triggered by DPI scaling, entering fullscreen mode, etc. Also, the
+    /// window could still be resized by calling [`Window::set_inner_size`].
     ///
     /// ## Platform-specific
     ///
     /// This only has an effect on desktop platforms.
     ///
-    /// Due to a bug in XFCE, this has no effect on Xfwm.
-    ///
-    /// ## Platform-specific
-    ///
+    /// - **X11:** Due to a bug in XFCE, this has no effect on Xfwm.
     /// - **iOS / Android / Web:** Unsupported.
+    ///
+    /// [`WindowEvent::Resized`]: crate::event::WindowEvent::Resized
     #[inline]
     pub fn set_resizable(&self, resizable: bool) {
         self.window.set_resizable(resizable)
+    }
+
+    /// Gets the window's current resizable state.
+    ///
+    /// ## Platform-specific
+    ///
+    /// - **X11:** Not implemented.
+    /// - **iOS / Android / Web:** Unsupported.
+    #[inline]
+    pub fn is_resizable(&self) -> bool {
+        self.window.is_resizable()
     }
 
     /// Sets the window to minimized or back
@@ -642,7 +699,6 @@ impl Window {
     ///
     /// ## Platform-specific
     ///
-    /// - **Wayland / X11:** Not implemented.
     /// - **iOS / Android / Web:** Unsupported.
     #[inline]
     pub fn is_maximized(&self) -> bool {
@@ -653,18 +709,18 @@ impl Window {
     ///
     /// ## Platform-specific
     ///
-    /// - **macOS:** `Fullscreen::Exclusive` provides true exclusive mode with a
+    /// - **macOS:** [`Fullscreen::Exclusive`] provides true exclusive mode with a
     ///   video mode change. *Caveat!* macOS doesn't provide task switching (or
     ///   spaces!) while in exclusive fullscreen mode. This mode should be used
     ///   when a video mode change is desired, but for a better user experience,
     ///   borderless fullscreen might be preferred.
     ///
-    ///   `Fullscreen::Borderless` provides a borderless fullscreen window on a
+    ///   [`Fullscreen::Borderless`] provides a borderless fullscreen window on a
     ///   separate space. This is the idiomatic way for fullscreen games to work
     ///   on macOS. See `WindowExtMacOs::set_simple_fullscreen` if
     ///   separate spaces are not preferred.
     ///
-    ///   The dock and the menu bar are always disabled in fullscreen mode.
+    ///   The dock and the menu bar are disabled in exclusive fullscreen mode.
     /// - **iOS:** Can only be called on the main thread.
     /// - **Wayland:** Does not support exclusive fullscreen mode and will no-op a request.
     /// - **Windows:** Screen saver is disabled in fullscreen mode.
@@ -691,11 +747,20 @@ impl Window {
     /// ## Platform-specific
     ///
     /// - **iOS / Android / Web:** Unsupported.
-    ///
-    /// [`setPrefersStatusBarHidden`]: https://developer.apple.com/documentation/uikit/uiviewcontroller/1621440-prefersstatusbarhidden?language=objc
     #[inline]
     pub fn set_decorations(&self, decorations: bool) {
         self.window.set_decorations(decorations)
+    }
+
+    /// Gets the window's current decorations state.
+    ///
+    /// ## Platform-specific
+    ///
+    /// - **X11:** Not implemented.
+    /// - **iOS / Android / Web:** Unsupported.
+    #[inline]
+    pub fn is_decorated(&self) -> bool {
+        self.window.is_decorated()
     }
 
     /// Change whether or not the window will always be on top of other windows.
@@ -708,18 +773,20 @@ impl Window {
         self.window.set_always_on_top(always_on_top)
     }
 
-    /// Sets the window icon. On Windows and X11, this is typically the small icon in the top-left
+    /// Sets the window icon.
+    ///
+    /// On Windows and X11, this is typically the small icon in the top-left
     /// corner of the titlebar.
     ///
     /// ## Platform-specific
     ///
     /// - **iOS / Android / Web / Wayland / macOS:** Unsupported.
     ///
-    /// On Windows, this sets `ICON_SMALL`. The base size for a window icon is 16x16, but it's
-    /// recommended to account for screen scaling and pick a multiple of that, i.e. 32x32.
+    /// - **Windows:** Sets `ICON_SMALL`. The base size for a window icon is 16x16, but it's
+    ///   recommended to account for screen scaling and pick a multiple of that, i.e. 32x32.
     ///
-    /// X11 has no universal guidelines for icon sizes, so you're at the whims of the WM. That
-    /// said, it's usually in the same ballpark as on Windows.
+    /// - **X11:** Has no universal guidelines for icon sizes, so you're at the whims of the WM. That
+    ///   said, it's usually in the same ballpark as on Windows.
     #[inline]
     pub fn set_window_icon(&self, window_icon: Option<Icon>) {
         self.window.set_window_icon(window_icon)
@@ -727,12 +794,62 @@ impl Window {
 
     /// Sets location of IME candidate box in client area coordinates relative to the top left.
     ///
+    /// This is the window / popup / overlay that allows you to select the desired characters.
+    /// The look of this box may differ between input devices, even on the same platform.
+    ///
+    /// (Apple's official term is "candidate window", see their [chinese] and [japanese] guides).
+    ///
+    /// ## Example
+    ///
+    /// ```no_run
+    /// # use winit::dpi::{LogicalPosition, PhysicalPosition};
+    /// # use winit::event_loop::EventLoop;
+    /// # use winit::window::Window;
+    /// # let mut event_loop = EventLoop::new();
+    /// # let window = Window::new(&event_loop).unwrap();
+    /// // Specify the position in logical dimensions like this:
+    /// window.set_ime_position(LogicalPosition::new(400.0, 200.0));
+    ///
+    /// // Or specify the position in physical dimensions like this:
+    /// window.set_ime_position(PhysicalPosition::new(400, 200));
+    /// ```
+    ///
     /// ## Platform-specific
     ///
     /// - **iOS / Android / Web:** Unsupported.
+    ///
+    /// [chinese]: https://support.apple.com/guide/chinese-input-method/use-the-candidate-window-cim12992/104/mac/12.0
+    /// [japanese]: https://support.apple.com/guide/japanese-input-method/use-the-candidate-window-jpim10262/6.3/mac/12.0
     #[inline]
     pub fn set_ime_position<P: Into<Position>>(&self, position: P) {
         self.window.set_ime_position(position.into())
+    }
+
+    /// Sets whether the window should get IME events
+    ///
+    /// When IME is allowed, the window will receive [`Ime`] events, and during the
+    /// preedit phase the window will NOT get [`KeyboardInput`] or
+    /// [`ReceivedCharacter`] events. The window should allow IME while it is
+    /// expecting text input.
+    ///
+    /// When IME is not allowed, the window won't receive [`Ime`] events, and will
+    /// receive [`KeyboardInput`] events for every keypress instead. Without
+    /// allowing IME, the window will also get [`ReceivedCharacter`] events for
+    /// certain keyboard input. Not allowing IME is useful for games for example.
+    ///
+    /// IME is **not** allowed by default.
+    ///
+    /// ## Platform-specific
+    ///
+    /// - **macOS:** IME must be enabled to receive text-input where dead-key sequences are combined.
+    /// - **iOS / Android / Web:** Unsupported.
+    ///
+    /// [`Ime`]: crate::event::WindowEvent::Ime
+    /// [`KeyboardInput`]: crate::event::WindowEvent::KeyboardInput
+    /// [`ReceivedCharacter`]: crate::event::WindowEvent::ReceivedCharacter
+    #[inline]
+    pub fn set_ime_allowed(&self, allowed: bool) {
+        self.window.set_ime_allowed(allowed);
     }
 
     /// Brings the window to the front and sets input focus. Has no effect if the window is
@@ -752,14 +869,14 @@ impl Window {
 
     /// Requests user attention to the window, this has no effect if the application
     /// is already focused. How requesting for user attention manifests is platform dependent,
-    /// see `UserAttentionType` for details.
+    /// see [`UserAttentionType`] for details.
     ///
     /// Providing `None` will unset the request for user attention. Unsetting the request for
     /// user attention might not be done automatically by the WM when the window receives input.
     ///
     /// ## Platform-specific
     ///
-    /// - **iOS / Android / Web :** Unsupported.
+    /// - **iOS / Android / Web:** Unsupported.
     /// - **macOS:** `None` has no effect.
     /// - **X11:** Requests for user attention must be manually cleared.
     /// - **Wayland:** Requires `xdg_activation_v1` protocol, `None` has no effect.
@@ -783,6 +900,19 @@ impl Window {
 
     /// Changes the position of the cursor in window coordinates.
     ///
+    /// ```no_run
+    /// # use winit::dpi::{LogicalPosition, PhysicalPosition};
+    /// # use winit::event_loop::EventLoop;
+    /// # use winit::window::Window;
+    /// # let mut event_loop = EventLoop::new();
+    /// # let window = Window::new(&event_loop).unwrap();
+    /// // Specify the position in logical dimensions like this:
+    /// window.set_cursor_position(LogicalPosition::new(400.0, 200.0));
+    ///
+    /// // Or specify the position in physical dimensions like this:
+    /// window.set_cursor_position(PhysicalPosition::new(400, 200));
+    /// ```
+    ///
     /// ## Platform-specific
     ///
     /// - **iOS / Android / Web / Wayland:** Always returns an [`ExternalError::NotSupported`].
@@ -791,18 +921,24 @@ impl Window {
         self.window.set_cursor_position(position.into())
     }
 
-    /// Grabs the cursor, preventing it from leaving the window.
+    /// Set grabbing [mode]([`CursorGrabMode`]) on the cursor preventing it from leaving the window.
     ///
-    /// There's no guarantee that the cursor will be hidden. You should
-    /// hide it by yourself if you want so.
+    /// # Example
     ///
-    /// ## Platform-specific
+    /// First try confining the cursor, and if that fails, try locking it instead.
     ///
-    /// - **macOS:** This locks the cursor in a fixed location, which looks visually awkward.
-    /// - **iOS / Android / Web:** Always returns an [`ExternalError::NotSupported`].
+    /// ```no_run
+    /// # use winit::event_loop::EventLoop;
+    /// # use winit::window::{CursorGrabMode, Window};
+    /// # let mut event_loop = EventLoop::new();
+    /// # let window = Window::new(&event_loop).unwrap();
+    /// window.set_cursor_grab(CursorGrabMode::Confined)
+    ///             .or_else(|_e| window.set_cursor_grab(CursorGrabMode::Locked))
+    ///             .unwrap();
+    /// ```
     #[inline]
-    pub fn set_cursor_grab(&self, grab: bool) -> Result<(), ExternalError> {
-        self.window.set_cursor_grab(grab)
+    pub fn set_cursor_grab(&self, mode: CursorGrabMode) -> Result<(), ExternalError> {
+        self.window.set_cursor_grab(mode)
     }
 
     /// Modifies the cursor's visibility.
@@ -837,6 +973,19 @@ impl Window {
     pub fn drag_window(&self) -> Result<(), ExternalError> {
         self.window.drag_window()
     }
+
+    /// Modifies whether the window catches cursor events.
+    ///
+    /// If `true`, the window will catch the cursor events. If `false`, events are passed through
+    /// the window such that any other window behind it receives them. By default hittest is enabled.
+    ///
+    /// ## Platform-specific
+    ///
+    /// - **iOS / Android / Web / X11:** Always returns an [`ExternalError::NotSupported`].
+    #[inline]
+    pub fn set_cursor_hittest(&self, hittest: bool) -> Result<(), ExternalError> {
+        self.window.set_cursor_hittest(hittest)
+    }
 }
 
 /// Monitor info functions.
@@ -855,11 +1004,13 @@ impl Window {
 
     /// Returns the list of all the monitors available on the system.
     ///
-    /// This is the same as `EventLoopWindowTarget::available_monitors`, and is provided for convenience.
+    /// This is the same as [`EventLoopWindowTarget::available_monitors`], and is provided for convenience.
     ///
     /// ## Platform-specific
     ///
     /// **iOS:** Can only be called on the main thread.
+    ///
+    /// [`EventLoopWindowTarget::available_monitors`]: crate::event_loop::EventLoopWindowTarget::available_monitors
     #[inline]
     pub fn available_monitors(&self) -> impl Iterator<Item = MonitorHandle> {
         self.window
@@ -872,28 +1023,80 @@ impl Window {
     ///
     /// Returns `None` if it can't identify any monitor as a primary one.
     ///
-    /// This is the same as `EventLoopWindowTarget::primary_monitor`, and is provided for convenience.
+    /// This is the same as [`EventLoopWindowTarget::primary_monitor`], and is provided for convenience.
     ///
     /// ## Platform-specific
     ///
     /// **iOS:** Can only be called on the main thread.
     /// **Wayland:** Always returns `None`.
+    ///
+    /// [`EventLoopWindowTarget::primary_monitor`]: crate::event_loop::EventLoopWindowTarget::primary_monitor
     #[inline]
     pub fn primary_monitor(&self) -> Option<MonitorHandle> {
         self.window.primary_monitor()
     }
 }
-
-unsafe impl raw_window_handle::HasRawWindowHandle for Window {
-    /// Returns a `raw_window_handle::RawWindowHandle` for the Window
+unsafe impl HasRawWindowHandle for Window {
+    /// Returns a [`raw_window_handle::RawWindowHandle`] for the Window
     ///
     /// ## Platform-specific
     ///
-    /// - **Android:** Only available after receiving the Resumed event and before Suspended. *If you*
-    /// *try to get the handle outside of that period, this function will panic*!
-    fn raw_window_handle(&self) -> raw_window_handle::RawWindowHandle {
+    /// ### Android
+    ///
+    /// Only available after receiving [`Event::Resumed`] and before [`Event::Suspended`]. *If you
+    /// try to get the handle outside of that period, this function will panic*!
+    ///
+    /// Make sure to release or destroy any resources created from this `RawWindowHandle` (ie. Vulkan
+    /// or OpenGL surfaces) before returning from [`Event::Suspended`], at which point Android will
+    /// release the underlying window/surface: any subsequent interaction is undefined behavior.
+    ///
+    /// [`Event::Resumed`]: crate::event::Event::Resumed
+    /// [`Event::Suspended`]: crate::event::Event::Suspended
+    fn raw_window_handle(&self) -> RawWindowHandle {
         self.window.raw_window_handle()
     }
+}
+
+unsafe impl HasRawDisplayHandle for Window {
+    /// Returns a [`raw_window_handle::RawDisplayHandle`] used by the [`EventLoop`] that
+    /// created a window.
+    ///
+    /// [`EventLoop`]: crate::event_loop::EventLoop
+    fn raw_display_handle(&self) -> RawDisplayHandle {
+        self.window.raw_display_handle()
+    }
+}
+
+/// The behavior of cursor grabbing.
+///
+/// Use this enum with [`Window::set_cursor_grab`] to grab the cursor.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum CursorGrabMode {
+    /// No grabbing of the cursor is performed.
+    None,
+
+    /// The cursor is confined to the window area.
+    ///
+    /// There's no guarantee that the cursor will be hidden. You should hide it by yourself if you
+    /// want to do so.
+    ///
+    /// ## Platform-specific
+    ///
+    /// - **macOS:** Not implemented. Always returns [`ExternalError::NotSupported`] for now.
+    /// - **iOS / Android / Web:** Always returns an [`ExternalError::NotSupported`].
+    Confined,
+
+    /// The cursor is locked inside the window area to the certain position.
+    ///
+    /// There's no guarantee that the cursor will be hidden. You should hide it by yourself if you
+    /// want to do so.
+    ///
+    /// ## Platform-specific
+    ///
+    /// - **X11 / Windows:** Not implemented. Always returns [`ExternalError::NotSupported`] for now.
+    /// - **iOS / Android:** Always returns an [`ExternalError::NotSupported`].
+    Locked,
 }
 
 /// Describes the appearance of the mouse cursor.
@@ -962,7 +1165,7 @@ impl Default for CursorIcon {
 }
 
 /// Fullscreen modes.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Fullscreen {
     Exclusive(VideoMode),
 
@@ -970,7 +1173,7 @@ pub enum Fullscreen {
     Borderless(Option<MonitorHandle>),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Theme {
     Light,
     Dark,
@@ -978,14 +1181,19 @@ pub enum Theme {
 
 /// ## Platform-specific
 ///
-/// - **X11:** Sets the WM's `XUrgencyHint`. No distinction between `Critical` and `Informational`.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// - **X11:** Sets the WM's `XUrgencyHint`. No distinction between [`Critical`] and [`Informational`].
+///
+/// [`Critical`]: Self::Critical
+/// [`Informational`]: Self::Informational
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UserAttentionType {
     /// ## Platform-specific
+    ///
     /// - **macOS:** Bounces the dock icon until the application is in focus.
     /// - **Windows:** Flashes both the window and the taskbar button until the application is in focus.
     Critical,
     /// ## Platform-specific
+    ///
     /// - **macOS:** Bounces the dock icon once.
     /// - **Windows:** Flashes the taskbar button until the application is in focus.
     Informational,
