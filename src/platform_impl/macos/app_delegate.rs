@@ -116,7 +116,7 @@ fn parse_url(event: *mut Object) -> Option<String> {
         let nsstring: *mut Object = msg_send![subevent, stringValue];
 
         let cstr: *const i8 = msg_send![nsstring, UTF8String];
-        if cstr != std::ptr::null() {
+        if cstr.is_null() {
             Some(
                 std::ffi::CStr::from_ptr(cstr)
                     .to_string_lossy()
