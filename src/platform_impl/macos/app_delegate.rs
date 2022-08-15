@@ -1,16 +1,17 @@
-use std::{
-    cell::{RefCell, RefMut},
-    os::raw::c_void,
-};
-
+use crate::event::{Event, MacOS, PlatformSpecific};
+use crate::platform::macos::ActivationPolicy;
+use crate::platform_impl::platform::{app_state::AppState, event::EventWrapper};
 use cocoa::base::id;
 use objc::{
     declare::ClassDecl,
     runtime::{Class, Object, Sel},
 };
 use once_cell::sync::Lazy;
+use std::{
+    cell::{RefCell, RefMut},
+    os::raw::c_void,
+};
 
-use crate::{platform::macos::ActivationPolicy, platform_impl::platform::app_state::AppState};
 
 static AUX_DELEGATE_STATE_NAME: &str = "auxState";
 
@@ -18,6 +19,16 @@ pub struct AuxDelegateState {
     pub activation_policy: ActivationPolicy,
     pub default_menu: bool,
 }
+
+
+/// Apple constants
+#[allow(non_upper_case_globals)]
+pub const kInternetEventClass: u32 = 0x4755524c;
+#[allow(non_upper_case_globals)]
+pub const kAEGetURL: u32 = 0x4755524c;
+#[allow(non_upper_case_globals)]
+pub const keyDirectObject: u32 = 0x2d2d2d2d;
+
 
 pub struct AppDelegateClass(pub *const Class);
 
