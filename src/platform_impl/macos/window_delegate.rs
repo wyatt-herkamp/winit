@@ -32,7 +32,7 @@ use crate::{
 pub struct WindowDelegateState {
     ns_window: IdRef,
     // never changes
-    ns_view: IdRef,   // never changes
+    ns_view: IdRef, // never changes
 
     window: Weak<UnownedWindow>,
 
@@ -70,8 +70,8 @@ impl WindowDelegateState {
     }
 
     fn with_window<F, T>(&mut self, callback: F) -> Option<T>
-        where
-            F: FnOnce(&UnownedWindow) -> T,
+    where
+        F: FnOnce(&UnownedWindow) -> T,
     {
         self.window.upgrade().map(|ref window| callback(window))
     }

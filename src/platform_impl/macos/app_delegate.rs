@@ -12,14 +12,12 @@ use std::{
     os::raw::c_void,
 };
 
-
 static AUX_DELEGATE_STATE_NAME: &str = "auxState";
 
 pub struct AuxDelegateState {
     pub activation_policy: ActivationPolicy,
     pub default_menu: bool,
 }
-
 
 /// Apple constants
 #[allow(non_upper_case_globals)]
@@ -28,7 +26,6 @@ pub const kInternetEventClass: u32 = 0x4755524c;
 pub const kAEGetURL: u32 = 0x4755524c;
 #[allow(non_upper_case_globals)]
 pub const keyDirectObject: u32 = 0x2d2d2d2d;
-
 
 pub struct AppDelegateClass(pub *const Class);
 
@@ -66,11 +63,11 @@ pub static APP_DELEGATE_CLASS: Lazy<AppDelegateClass> = Lazy::new(|| unsafe {
         sel!(handleEvent:withReplyEvent:),
         handle_url
             as extern "C" fn(
-            &objc::runtime::Object,
-            _cmd: objc::runtime::Sel,
-            event: *mut Object,
-            _reply: u64,
-        ),
+                &objc::runtime::Object,
+                _cmd: objc::runtime::Sel,
+                event: *mut Object,
+                _reply: u64,
+            ),
     );
 
     AppDelegateClass(decl.register())
