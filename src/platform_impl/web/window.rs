@@ -4,12 +4,12 @@ use crate::event;
 use crate::icon::Icon;
 use crate::monitor::MonitorHandle as RootMH;
 use crate::window::{
-    CursorIcon, Fullscreen, UserAttentionType, WindowAttributes, WindowId as RootWI,
+    CursorGrabMode, CursorIcon, Fullscreen, UserAttentionType, WindowAttributes, WindowId as RootWI,
 };
 
-use raw_window_handle::web::WebHandle;
+use raw_window_handle::{RawDisplayHandle, RawWindowHandle, WebDisplayHandle, WebWindowHandle};
 
-use super::{backend, monitor, EventLoopWindowTarget};
+use super::{backend, monitor::MonitorHandle, EventLoopWindowTarget};
 
 use std::cell::{Ref, RefCell};
 use std::collections::vec_deque::IntoIter as VecDequeIter;
@@ -19,28 +19,30 @@ use std::rc::Rc;
 pub struct Window {
     canvas: Rc<RefCell<backend::Canvas>>,
     previous_pointer: RefCell<&'static str>,
-    id: Id,
+    id: WindowId,
     register_redraw_request: Box<dyn Fn()>,
     resize_notify_fn: Box<dyn Fn(PhysicalSize<u32>)>,
     destroy_fn: Option<Box<dyn FnOnce()>>,
 }
 
 impl Window {
-    pub fn new<T>(
+    pub(crate) fn new<T>(
         target: &EventLoopWindowTarget<T>,
         attr: WindowAttributes,
-        platform_attr: PlatformSpecificBuilderAttributes,
+        platform_attr: PlatformSpecificWindowBuilderAttributes,
     ) -> Result<Self, RootOE> {
         let runner = target.runner.clone();
 
         let id = target.generate_id();
 
+        let prevent_default = platform_attr.prevent_default;
+
         let canvas = backend::Canvas::create(platform_attr)?;
-        let mut canvas = Rc::new(RefCell::new(canvas));
+        let canvas = Rc::new(RefCell::new(canvas));
 
         let register_redraw_request = Box::new(move || runner.request_redraw(RootWI(id)));
 
-        target.register(&mut canvas, id);
+        target.register(&canvas, id, prevent_default);
 
         let runner = target.runner.clone();
         let resize_notify_fn = Box::new(move |new_size| {
@@ -77,7 +79,7 @@ impl Window {
         Ok(window)
     }
 
-    pub fn canvas<'a>(&'a self) -> Ref<'a, backend::Canvas> {
+    pub fn canvas(&self) -> Ref<'_, backend::Canvas> {
         self.canvas.borrow()
     }
 
@@ -87,6 +89,11 @@ impl Window {
 
     pub fn set_visible(&self, _visible: bool) {
         // Intentionally a no-op
+    }
+
+    #[inline]
+    pub fn is_visible(&self) -> Option<bool> {
+        None
     }
 
     pub fn request_redraw(&self) {
@@ -151,6 +158,10 @@ impl Window {
         // Intentionally a no-op: users can't resize canvas elements
     }
 
+    pub fn is_resizable(&self) -> bool {
+        true
+    }
+
     #[inline]
     pub fn scale_factor(&self) -> f64 {
         super::backend::scale_factor()
@@ -207,8 +218,19 @@ impl Window {
     }
 
     #[inline]
-    pub fn set_cursor_grab(&self, _grab: bool) -> Result<(), ExternalError> {
-        Err(ExternalError::NotSupported(NotSupportedError::new()))
+    pub fn set_cursor_grab(&self, mode: CursorGrabMode) -> Result<(), ExternalError> {
+        let lock = match mode {
+            CursorGrabMode::None => false,
+            CursorGrabMode::Locked => true,
+            CursorGrabMode::Confined => {
+                return Err(ExternalError::NotSupported(NotSupportedError::new()))
+            }
+        };
+
+        self.canvas
+            .borrow()
+            .set_cursor_lock(lock)
+            .map_err(ExternalError::Os)
     }
 
     #[inline]
@@ -224,6 +246,11 @@ impl Window {
 
     #[inline]
     pub fn drag_window(&self) -> Result<(), ExternalError> {
+        Err(ExternalError::NotSupported(NotSupportedError::new()))
+    }
+
+    #[inline]
+    pub fn set_cursor_hittest(&self, _hittest: bool) -> Result<(), ExternalError> {
         Err(ExternalError::NotSupported(NotSupportedError::new()))
     }
 
@@ -266,6 +293,10 @@ impl Window {
         // Intentionally a no-op, no canvas decorations
     }
 
+    pub fn is_decorated(&self) -> bool {
+        true
+    }
+
     #[inline]
     pub fn set_always_on_top(&self, _always_on_top: bool) {
         // Intentionally a no-op, no window ordering
@@ -282,6 +313,11 @@ impl Window {
     }
 
     #[inline]
+    pub fn set_ime_allowed(&self, _allowed: bool) {
+        // Currently not implemented
+    }
+
+    #[inline]
     pub fn focus_window(&self) {
         // Currently a no-op as it does not seem there is good support for this on web
     }
@@ -295,7 +331,7 @@ impl Window {
     // Allow directly accessing the current monitor internally without unwrapping.
     fn current_monitor_inner(&self) -> RootMH {
         RootMH {
-            inner: monitor::Handle,
+            inner: MonitorHandle,
         }
     }
 
@@ -305,30 +341,32 @@ impl Window {
     }
 
     #[inline]
-    pub fn available_monitors(&self) -> VecDequeIter<monitor::Handle> {
+    pub fn available_monitors(&self) -> VecDequeIter<MonitorHandle> {
         VecDeque::new().into_iter()
     }
 
     #[inline]
     pub fn primary_monitor(&self) -> Option<RootMH> {
         Some(RootMH {
-            inner: monitor::Handle,
+            inner: MonitorHandle,
         })
     }
 
     #[inline]
-    pub fn id(&self) -> Id {
-        return self.id;
+    pub fn id(&self) -> WindowId {
+        self.id
     }
 
     #[inline]
-    pub fn raw_window_handle(&self) -> raw_window_handle::RawWindowHandle {
-        let handle = WebHandle {
-            id: self.id.0,
-            ..WebHandle::empty()
-        };
+    pub fn raw_window_handle(&self) -> RawWindowHandle {
+        let mut window_handle = WebWindowHandle::empty();
+        window_handle.id = self.id.0;
+        RawWindowHandle::Web(window_handle)
+    }
 
-        raw_window_handle::RawWindowHandle::Web(handle)
+    #[inline]
+    pub fn raw_display_handle(&self) -> RawDisplayHandle {
+        RawDisplayHandle::Web(WebDisplayHandle::empty())
     }
 }
 
@@ -341,15 +379,39 @@ impl Drop for Window {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Id(pub(crate) u32);
+pub struct WindowId(pub(crate) u32);
 
-impl Id {
-    pub const unsafe fn dummy() -> Id {
-        Id(0)
+impl WindowId {
+    pub const unsafe fn dummy() -> Self {
+        Self(0)
     }
 }
 
-#[derive(Default, Clone)]
-pub struct PlatformSpecificBuilderAttributes {
+impl From<WindowId> for u64 {
+    fn from(window_id: WindowId) -> Self {
+        window_id.0 as u64
+    }
+}
+
+impl From<u64> for WindowId {
+    fn from(raw_id: u64) -> Self {
+        Self(raw_id as u32)
+    }
+}
+
+#[derive(Clone)]
+pub struct PlatformSpecificWindowBuilderAttributes {
     pub(crate) canvas: Option<backend::RawCanvasType>,
+    pub(crate) prevent_default: bool,
+    pub(crate) focusable: bool,
+}
+
+impl Default for PlatformSpecificWindowBuilderAttributes {
+    fn default() -> Self {
+        Self {
+            canvas: None,
+            prevent_default: true,
+            focusable: true,
+        }
+    }
 }

@@ -7,13 +7,12 @@ use std::{
     sync::Arc,
 };
 
+use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 
 use super::{ffi, util, XConnection, XError};
 
-lazy_static! {
-    static ref GLOBAL_LOCK: Mutex<()> = Default::default();
-}
+static GLOBAL_LOCK: Lazy<Mutex<()>> = Lazy::new(Default::default);
 
 unsafe fn open_im(xconn: &Arc<XConnection>, locale_modifiers: &CStr) -> Option<ffi::XIM> {
     let _lock = GLOBAL_LOCK.lock();
@@ -42,12 +41,12 @@ unsafe fn open_im(xconn: &Arc<XConnection>, locale_modifiers: &CStr) -> Option<f
 #[derive(Debug)]
 pub struct InputMethod {
     pub im: ffi::XIM,
-    name: String,
+    _name: String,
 }
 
 impl InputMethod {
     fn new(im: ffi::XIM, name: String) -> Self {
-        InputMethod { im, name }
+        InputMethod { im, _name: name }
     }
 }
 
@@ -63,11 +62,7 @@ pub enum InputMethodResult {
 
 impl InputMethodResult {
     pub fn is_fallback(&self) -> bool {
-        if let &InputMethodResult::Fallback(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, InputMethodResult::Fallback(_))
     }
 
     pub fn ok(self) -> Option<InputMethod> {
@@ -185,10 +180,10 @@ impl PotentialInputMethod {
 }
 
 // By logging this struct, you get a sequential listing of every locale modifier tried, where it
-// came from, and if it succceeded.
+// came from, and if it succeeded.
 #[derive(Debug, Clone)]
 pub struct PotentialInputMethods {
-    // On correctly configured systems, the XMODIFIERS environemnt variable tells us everything we
+    // On correctly configured systems, the XMODIFIERS environment variable tells us everything we
     // need to know.
     xmodifiers: Option<PotentialInputMethod>,
     // We have some standard options at our disposal that should ostensibly always work. For users
@@ -218,7 +213,7 @@ impl PotentialInputMethods {
             // that case, we get `None` and end up skipping ahead to the next method.
             xmodifiers,
             fallbacks: [
-                // This is a standard input method that supports compose equences, which should
+                // This is a standard input method that supports compose sequences, which should
                 // always be available. `@im=none` appears to mean the same thing.
                 PotentialInputMethod::from_str("@im=local"),
                 // This explicitly specifies to use the implementation-dependent default, though
@@ -249,7 +244,7 @@ impl PotentialInputMethods {
     pub fn open_im(
         &mut self,
         xconn: &Arc<XConnection>,
-        callback: Option<&dyn Fn() -> ()>,
+        callback: Option<&dyn Fn()>,
     ) -> InputMethodResult {
         use self::InputMethodResult::*;
 
@@ -259,10 +254,8 @@ impl PotentialInputMethods {
             let im = input_method.open_im(xconn);
             if let Some(im) = im {
                 return XModifiers(im);
-            } else {
-                if let Some(ref callback) = callback {
-                    callback();
-                }
+            } else if let Some(ref callback) = callback {
+                callback();
             }
         }
 
